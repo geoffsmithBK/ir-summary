@@ -92,15 +92,30 @@ def main():
                     help="magnitude method: average |H| (linear) or |H|^2 then sqrt (power/RMS)")
     ap.add_argument("--length", type=int, default=0, help="output length in samples (0 = match inputs)")
     ap.add_argument("--norm", type=float, default=-0.2, help="output peak normalize target in dBFS")
-    ap.add_argument("-o", "--out", required=True, help="output WAV path")
+    ap.add_argument("-o", "--out", help="output WAV path (full path); alternative to --name")
+    ap.add_argument("--name", help="output base filename written into the --dir being summarized "
+                                   "(or cwd); alternative to -o")
+    ap.add_argument("--exclude", action="append", metavar="SUBSTR",
+                    help="skip input files whose name contains SUBSTR (repeatable)")
     ap.add_argument("--plot", action="store_true", help="also write a PNG magnitude-response comparison")
-    ap.add_argument("--reject-below-avg-treble", action="store_true",
+    ap.add_argument("--bright", action="store_true",
                     help="before averaging, drop IRs whose treble energy (>= --treble-hz) is below the cohort average")
     ap.add_argument("--treble-hz", type=float, default=5000.0,
-                    help="low edge of the treble band used by --reject-below-avg-treble (default 5000)")
+                    help="low edge of the treble band used by --bright (default 5000)")
     ap.add_argument("--treble-margin-db", type=float, default=0.0,
-                    help="rejection bar = cohort mean + margin; positive drops more, negative keeps more (default 0)")
+                    help="--bright bar = cohort mean + margin; positive drops more, negative keeps more (default 0)")
     args = ap.parse_args()
+
+    # resolve output path: -o is a full path; --name is a base filename placed in
+    # the folder being summarized (or cwd). exactly one is required.
+    if bool(args.out) == bool(args.name):
+        sys.exit("Specify exactly one of -o/--out (full path) or --name (filename into the source folder).")
+    if args.out:
+        out_path = args.out
+    else:
+        base = args.name if args.name.lower().endswith(".wav") else args.name + ".wav"
+        out_path = os.path.join(args.dir if args.dir else ".", base)
+    out_abs = os.path.abspath(out_path)
 
     files = list(args.files)
     if args.dir:
@@ -109,6 +124,25 @@ def main():
     if args.filter:
         files = [f for f in files if args.filter.lower() in os.path.basename(f).lower()]
     files = sorted(dict.fromkeys(files))  # de-dup, stable
+
+    # self-ingest guard + user --exclude: never average our own output (or any
+    # name the user excludes) back into the summary.
+    removed = []
+    kept = []
+    for f in files:
+        if os.path.abspath(f) == out_abs:
+            removed.append((os.path.basename(f), "would re-ingest output"))
+            continue
+        hit = next((p for p in (args.exclude or []) if p.lower() in os.path.basename(f).lower()), None)
+        if hit:
+            removed.append((os.path.basename(f), f"--exclude '{hit}'"))
+            continue
+        kept.append(f)
+    files = kept
+    if removed:
+        print(f"Excluded {len(removed)} file(s):")
+        for name, why in removed:
+            print(f"  - {name}  ({why})")
     if len(files) < 2:
         sys.exit(f"Need at least 2 IRs to average; found {len(files)}.")
 
@@ -135,7 +169,7 @@ def main():
 
     # ---- optional cohort trimming: drop IRs below the average treble energy ----
     dropped = []  # (name, aligned_signal, level_db) for plotting
-    if args.reject_below_avg_treble:
+    if args.bright:
         levels = np.array([band_level_db(x, sr, args.treble_hz) for x in aligned])
         mean_db = float(levels.mean())
         bar = mean_db + args.treble_margin_db
@@ -193,8 +227,8 @@ def main():
         target = 10 ** (args.norm / 20.0)
         out = out * (target / peak)
 
-    sf.write(args.out, out.astype(np.float32), sr, subtype="PCM_24")
-    print(f"\nWrote {args.out}  ({len(out)} samples, 24-bit, {sr} Hz)")
+    sf.write(out_path, out.astype(np.float32), sr, subtype="PCM_24")
+    print(f"\nWrote {out_path}  ({len(out)} samples, 24-bit, {sr} Hz)")
 
     if args.plot:
         import matplotlib
@@ -218,7 +252,7 @@ def main():
                         label="dropped (low treble)" if j == 0 else None)
         ax.semilogx(freqs, 20 * np.log10(np.maximum(mo, 1e-9)) - ref_db,
                     color="crimson", lw=2.2, label="AVERAGE")
-        if args.reject_below_avg_treble:
+        if args.bright:
             ax.axvline(args.treble_hz, color="darkorange", lw=1.0, ls=":",
                        label=f"treble cutoff {args.treble_hz:.0f} Hz")
         ax.set_xlim(20, sr / 2); ax.set_ylim(-40, 6)
@@ -229,13 +263,13 @@ def main():
         ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{int(v):,}"))
         ax.grid(True, which="major", alpha=0.3)
         ax.set_xlabel("Hz"); ax.set_ylabel("dB")
-        kept = len(files)
-        title = f"{os.path.basename(args.out)} — {kept} IRs (grey) vs average (red)"
+        n_kept = len(files)
+        title = f"{os.path.basename(out_path)} — {n_kept} IRs (grey) vs average (red)"
         if dropped:
             title += f"; {len(dropped)} dropped (dashed)"
         ax.set_title(title)
         ax.legend()
-        png = os.path.splitext(args.out)[0] + ".png"
+        png = os.path.splitext(out_path)[0] + ".png"
         fig.tight_layout(); fig.savefig(png, dpi=110)
         print(f"Wrote {png}")
 

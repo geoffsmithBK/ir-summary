@@ -30,12 +30,13 @@ close mic + "Distant 24in"), because the later arrival is a big time offset.
 ### Trimming the cohort before averaging
 
 The plain average can be "too representative" — dull mics drag the summary down.
-`--reject-below-avg-treble` measures each IR's energy from `--treble-hz` (default
-5000) up to Nyquist, takes the cohort mean, and **drops any IR below it** before
-averaging, so the summary reflects the brighter half of the pack. Tune the bar
-with `--treble-margin-db` (positive = drop more, negative = keep more). The tool
+`--bright` measures each IR's energy from `--treble-hz` (default 5000) up to
+Nyquist, takes the cohort mean, and **drops any IR below it** before averaging,
+so the summary reflects the brighter half of the pack. Tune the bar with
+`--treble-margin-db` (positive = drop more, negative = keep more). The tool
 prints each file's treble level in dB and which were kept/dropped; on the plot,
-dropped IRs are dashed blue and the cutoff is marked.
+dropped IRs are dashed blue and the cutoff is marked. (A mirror `--dark` flag is
+planned to keep the darker-than-average half.)
 
 ## Practical findings on the JBL E120-8 pack
 
@@ -73,9 +74,15 @@ earlier sessions — harmless; you can delete it.
   shifts and the plot are your two sanity gauges.
 - The frequency axis on the plot uses readable ticks (20, 50, 100, 200, 500,
   1,000 … 20,000 Hz), not powers of ten.
-- **Gotcha:** writing the output `.wav` into the same folder you're averaging
-  means a later run with the same `--filter` will re-ingest it. Write outputs
-  elsewhere, or use a name your `--filter` won't match.
+- **Output naming:** use `-o` for a full output path, or `--name "Foo"` to drop
+  `Foo.wav` straight into the `--dir` being summarized (handy for keeping a
+  pack's summary next to its IRs). Exactly one of the two is required.
+- **Self-ingest guard:** the tool never averages its own output back in — the
+  resolved output file is auto-excluded from the inputs, so re-running with
+  `--name` into a source folder is safe. For *other* leftover summaries (e.g. an
+  older `...- AVG ....wav` with a different name), use `--exclude SUBSTR`
+  (repeatable, case-insensitive) — e.g. `--exclude AVG --exclude Summary`.
+  Excluded files are listed at the top of the run with the reason.
 
 ### Easiest: the wrapper
 
@@ -100,14 +107,18 @@ python3 ir_average.py --dir "../Newer IRs/SOME OTHER CAB" -o "/path/out - AVG.wa
 # just one mic position across a folder:
 python3 ir_average.py --dir "../Newer IRs/SOME OTHER CAB" --filter "Cone" -o "out - AVG Cone.wav" --plot
 
-# brightest half of a pack (drop below-average treble):
-python3 ir_average.py --dir "../Newer IRs/SOME OTHER CAB" --reject-below-avg-treble -o "out - AVG bright.wav" --plot
+# drop the summary straight into the pack folder with a chosen name (safe to re-run):
+python3 ir_average.py --dir "../Newer IRs/SOME OTHER CAB" --name "SOME OTHER CAB - Summary" --plot
+
+# brightest half of a pack (drop below-average treble), excluding old summaries:
+python3 ir_average.py --dir "../Newer IRs/SOME OTHER CAB" --bright --exclude AVG --name "SOME OTHER CAB - Bright" --plot
 
 # hand-picked files:
 python3 ir_average.py "a.wav" "b.wav" "c.wav" -o "out - AVG.wav"
 ```
 
-Options: `--method {magnitude,timealign}`, `--weighting {linear,power}`,
+Options: `-o PATH` / `--name BASENAME` (one required), `--exclude SUBSTR`
+(repeatable), `--method {magnitude,timealign}`, `--weighting {linear,power}`,
 `--length N` (output samples, 0 = match inputs), `--norm dBFS` (default -0.2),
-`--filter SUBSTRING`, `--plot`, `--reject-below-avg-treble`,
-`--treble-hz HZ` (default 5000), `--treble-margin-db DB` (default 0).
+`--filter SUBSTRING`, `--plot`, `--bright`, `--treble-hz HZ` (default 5000),
+`--treble-margin-db DB` (default 0).
