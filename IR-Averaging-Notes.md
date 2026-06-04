@@ -58,7 +58,7 @@ is nothing to average — the tool writes nothing and instead names that single
 best-fit file so you can use it directly. (Zero matches → it tells you to loosen
 `--margin-db`.)
 
-## Practical findings on the JBL E120-8 pack
+## Practical findings on a test case (JBL E120-8 pack from TONE3000.com)
 
 - 33 IRs, all **48 kHz / 24-bit / mono / 0.5 s** (24,000 samples).
 - The 7 **Cap Edge** mics (C414, i5, MD421, R121, SM57, SM7B, SM94) were already
@@ -77,14 +77,11 @@ best-fit file so you can use it directly. (Zero matches → it tells you to loos
 Lives in its own git repo alongside `run-average.sh`
 and this file. Uses numpy / scipy / soundfile / matplotlib in a `.ir-tools-venv`
 venv that `run-average.sh` creates inside the repo on first run (gitignored).
-A separate, now-orphaned `.ir-tools-venv` may still sit at the archive root from
-earlier sessions — harmless; you can delete it.
 
 ### Behavior notes
 - Auto-aligns every file via cross-correlation and prints each file's sample
   shift. **Prints a WARNING** when any file's shift exceeds **50 samples
-  (~1 ms @ 48k)** — usually a distant/rear mic that snuck in; consider a
-  `--filter` to keep the set coherent. (It still corrects the shift either way.)
+  (~1 ms @ 48k)** — usually a distant/rear mic that snuck in (we still correct the shift either way).
 - Defaults: `--method magnitude`, `--weighting linear`, peak-normalized to
   `-0.2 dBFS`. `-o` is required; `--plot` writes a same-named `.png`.
 - Hard-stops if sample rates differ across files, or if fewer than 2 files
