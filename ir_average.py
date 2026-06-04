@@ -70,6 +70,18 @@ def minimum_phase_from_mag(mag):
     return h
 
 
+def band_level_db(x, sr, lo, hi=None):
+    """Energy of x within [lo, hi] Hz, in dB. Magnitude-based, so it's
+    independent of any time shift applied to x."""
+    if hi is None:
+        hi = sr / 2
+    X = np.fft.rfft(x)
+    f = np.fft.rfftfreq(len(x), 1 / sr)
+    band = (f >= lo) & (f <= hi)
+    energy = np.sum(np.abs(X[band]) ** 2)
+    return 10 * np.log10(max(energy, 1e-20))
+
+
 def main():
     ap = argparse.ArgumentParser(description="Average impulse responses into one summary IR.")
     ap.add_argument("files", nargs="*", help="explicit IR files to average")
@@ -82,6 +94,12 @@ def main():
     ap.add_argument("--norm", type=float, default=-0.2, help="output peak normalize target in dBFS")
     ap.add_argument("-o", "--out", required=True, help="output WAV path")
     ap.add_argument("--plot", action="store_true", help="also write a PNG magnitude-response comparison")
+    ap.add_argument("--reject-below-avg-treble", action="store_true",
+                    help="before averaging, drop IRs whose treble energy (>= --treble-hz) is below the cohort average")
+    ap.add_argument("--treble-hz", type=float, default=5000.0,
+                    help="low edge of the treble band used by --reject-below-avg-treble (default 5000)")
+    ap.add_argument("--treble-margin-db", type=float, default=0.0,
+                    help="rejection bar = cohort mean + margin; positive drops more, negative keeps more (default 0)")
     args = ap.parse_args()
 
     files = list(args.files)
@@ -114,6 +132,30 @@ def main():
     for x in sigs:
         xa, lag = align_to_ref(x, ref)
         aligned.append(xa); lags.append(lag)
+
+    # ---- optional cohort trimming: drop IRs below the average treble energy ----
+    dropped = []  # (name, aligned_signal, level_db) for plotting
+    if args.reject_below_avg_treble:
+        levels = np.array([band_level_db(x, sr, args.treble_hz) for x in aligned])
+        mean_db = float(levels.mean())
+        bar = mean_db + args.treble_margin_db
+        print(f"Treble screen: band >= {args.treble_hz:.0f} Hz, cohort mean = {mean_db:+.2f} dB"
+              + ("" if args.treble_margin_db == 0 else f", bar = {bar:+.2f} dB"))
+        keep = []
+        for i, f in enumerate(files):
+            tag = "keep" if levels[i] >= bar else "DROP"
+            print(f"  [{tag}] {os.path.basename(f):55} {levels[i]:+.2f} dB")
+            if levels[i] >= bar:
+                keep.append(i)
+            else:
+                dropped.append((os.path.basename(f), aligned[i], levels[i]))
+        if len(keep) < 2:
+            sys.exit(f"Treble screen left {len(keep)} file(s); need >= 2. "
+                     f"Loosen with a negative --treble-margin-db or a different --treble-hz.")
+        files   = [files[i]   for i in keep]
+        aligned = [aligned[i] for i in keep]
+        lags    = [lags[i]    for i in keep]
+        print(f"  -> averaging {len(keep)} of {len(keep) + len(dropped)} IRs\n")
 
     WARN_SHIFT = 50  # samples (~1 ms @ 48k); larger usually means a distant/rear mic snuck in
     print(f"Averaging {len(files)} IRs @ {sr} Hz, method={args.method}, weighting={args.weighting}")
@@ -158,24 +200,43 @@ def main():
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
+        from matplotlib.ticker import FixedLocator, FuncFormatter
         N = L
         freqs = np.fft.rfftfreq(N, 1 / sr)
         mo = np.abs(np.fft.rfft(out, N))
         ref_db = 20 * np.log10(np.maximum(mo.max(), 1e-9))  # put average peak at 0 dB
-        plt.figure(figsize=(11, 6))
+        fig, ax = plt.subplots(figsize=(11, 6))
         for f, x in zip(files, aligned):
             m = np.abs(np.fft.rfft(x, N))
-            plt.semilogx(freqs, 20 * np.log10(np.maximum(m, 1e-9)) - ref_db,
-                         color="0.72", lw=0.8)
-        plt.semilogx(freqs, 20 * np.log10(np.maximum(mo, 1e-9)) - ref_db,
-                     color="crimson", lw=2.2, label="AVERAGE")
-        plt.xlim(20, sr / 2); plt.ylim(-40, 6)
-        plt.grid(True, which="both", alpha=0.3)
-        plt.xlabel("Hz"); plt.ylabel("dB")
-        plt.title(f"{os.path.basename(args.out)} — {len(files)} IRs (grey) vs average (red)")
-        plt.legend()
+            ax.semilogx(freqs, 20 * np.log10(np.maximum(m, 1e-9)) - ref_db,
+                        color="0.72", lw=0.8)
+        # dropped IRs (if any) as dashed blue so you can see what was excluded
+        for j, (name, x, lvl) in enumerate(dropped):
+            m = np.abs(np.fft.rfft(x, N))
+            ax.semilogx(freqs, 20 * np.log10(np.maximum(m, 1e-9)) - ref_db,
+                        color="steelblue", lw=1.0, ls="--",
+                        label="dropped (low treble)" if j == 0 else None)
+        ax.semilogx(freqs, 20 * np.log10(np.maximum(mo, 1e-9)) - ref_db,
+                    color="crimson", lw=2.2, label="AVERAGE")
+        if args.reject_below_avg_treble:
+            ax.axvline(args.treble_hz, color="darkorange", lw=1.0, ls=":",
+                       label=f"treble cutoff {args.treble_hz:.0f} Hz")
+        ax.set_xlim(20, sr / 2); ax.set_ylim(-40, 6)
+        # readable, non-exponential frequency ticks
+        ticks = [t for t in (20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000) if t <= sr / 2]
+        ax.xaxis.set_major_locator(FixedLocator(ticks))
+        ax.xaxis.set_minor_locator(FixedLocator([]))  # no minor ticks/labels
+        ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{int(v):,}"))
+        ax.grid(True, which="major", alpha=0.3)
+        ax.set_xlabel("Hz"); ax.set_ylabel("dB")
+        kept = len(files)
+        title = f"{os.path.basename(args.out)} — {kept} IRs (grey) vs average (red)"
+        if dropped:
+            title += f"; {len(dropped)} dropped (dashed)"
+        ax.set_title(title)
+        ax.legend()
         png = os.path.splitext(args.out)[0] + ".png"
-        plt.tight_layout(); plt.savefig(png, dpi=110)
+        fig.tight_layout(); fig.savefig(png, dpi=110)
         print(f"Wrote {png}")
 
 

@@ -27,6 +27,16 @@ close mic + "Distant 24in"), because the later arrival is a big time offset.
 3. **Power/RMS averaging** (`--weighting power`) — average magnitude² then sqrt;
    slightly favors the louder/brighter mics ("loudest common voice").
 
+### Trimming the cohort before averaging
+
+The plain average can be "too representative" — dull mics drag the summary down.
+`--reject-below-avg-treble` measures each IR's energy from `--treble-hz` (default
+5000) up to Nyquist, takes the cohort mean, and **drops any IR below it** before
+averaging, so the summary reflects the brighter half of the pack. Tune the bar
+with `--treble-margin-db` (positive = drop more, negative = keep more). The tool
+prints each file's treble level in dB and which were kept/dropped; on the plot,
+dropped IRs are dashed blue and the cutoff is marked.
+
 ## Practical findings on the JBL E120-8 pack
 
 - 33 IRs, all **48 kHz / 24-bit / mono / 0.5 s** (24,000 samples).
@@ -43,8 +53,12 @@ close mic + "Distant 24in"), because the later arrival is a big time offset.
 
 ## The tool: `ir_average.py`
 
-Lives at the archive root: `/Users/gsmith/Desktop/Speaker IR Archive/ir_average.py`
-Uses numpy / scipy / soundfile / matplotlib in the `.ir-tools-venv` venv there.
+Lives in its own git repo at
+`/Users/gsmith/Desktop/Speaker IR Archive/ir_average/` alongside `run-average.sh`
+and this file. Uses numpy / scipy / soundfile / matplotlib in a `.ir-tools-venv`
+venv that `run-average.sh` creates inside the repo on first run (gitignored).
+A separate, now-orphaned `.ir-tools-venv` may still sit at the archive root from
+earlier sessions — harmless; you can delete it.
 
 ### Behavior notes
 - Auto-aligns every file via cross-correlation and prints each file's sample
@@ -57,29 +71,37 @@ Uses numpy / scipy / soundfile / matplotlib in the `.ir-tools-venv` venv there.
   survive the filter.
 - A new folder may not be normalized or aligned like this pack — the printed
   shifts and the plot are your two sanity gauges.
+- The frequency axis on the plot uses readable ticks (20, 50, 100, 200, 500,
+  1,000 … 20,000 Hz), not powers of ten.
+- **Gotcha:** writing the output `.wav` into the same folder you're averaging
+  means a later run with the same `--filter` will re-ingest it. Write outputs
+  elsewhere, or use a name your `--filter` won't match.
 
 ### Easiest: the wrapper
 
-`run-average.sh` (archive root) activates the venv for you — creating it on first
-run if missing — and forwards all args to `ir_average.py`. Works from any
+`run-average.sh` (in the repo dir) activates the venv for you — creating it on
+first run if missing — and forwards all args to `ir_average.py`. Works from any
 directory:
 
 ```bash
-"/Users/gsmith/Desktop/Speaker IR Archive/run-average.sh" \
-  --dir "Newer IRs/SOME CAB" --filter "Cap Edge" -o "out - AVG.wav" --plot
+"/Users/gsmith/Desktop/Speaker IR Archive/ir_average/run-average.sh" \
+  --dir "../Newer IRs/SOME CAB" --filter "Cap Edge" -o "out - AVG.wav" --plot
 ```
 
 ### Manual usage (without the wrapper)
 
 ```bash
-cd "/Users/gsmith/Desktop/Speaker IR Archive"
-source .ir-tools-venv/bin/activate
+cd "/Users/gsmith/Desktop/Speaker IR Archive/ir_average"
+source .ir-tools-venv/bin/activate   # or ../.ir-tools-venv if reusing the old one
 
 # whole folder:
-python3 ir_average.py --dir "Newer IRs/SOME OTHER CAB" -o "/path/out - AVG.wav" --plot
+python3 ir_average.py --dir "../Newer IRs/SOME OTHER CAB" -o "/path/out - AVG.wav" --plot
 
 # just one mic position across a folder:
-python3 ir_average.py --dir "Newer IRs/SOME OTHER CAB" --filter "Cone" -o "out - AVG Cone.wav" --plot
+python3 ir_average.py --dir "../Newer IRs/SOME OTHER CAB" --filter "Cone" -o "out - AVG Cone.wav" --plot
+
+# brightest half of a pack (drop below-average treble):
+python3 ir_average.py --dir "../Newer IRs/SOME OTHER CAB" --reject-below-avg-treble -o "out - AVG bright.wav" --plot
 
 # hand-picked files:
 python3 ir_average.py "a.wav" "b.wav" "c.wav" -o "out - AVG.wav"
@@ -87,4 +109,5 @@ python3 ir_average.py "a.wav" "b.wav" "c.wav" -o "out - AVG.wav"
 
 Options: `--method {magnitude,timealign}`, `--weighting {linear,power}`,
 `--length N` (output samples, 0 = match inputs), `--norm dBFS` (default -0.2),
-`--filter SUBSTRING`, `--plot`.
+`--filter SUBSTRING`, `--plot`, `--reject-below-avg-treble`,
+`--treble-hz HZ` (default 5000), `--treble-margin-db DB` (default 0).
