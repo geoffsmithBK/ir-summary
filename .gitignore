@@ -5,3 +5,6 @@
 *.wav
 *.png
 __pycache__/
+
+# Brainstorming visual-companion artifacts
+.superpowers/
