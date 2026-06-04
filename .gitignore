@@ -1,0 +1,7 @@
+# Python venv created by run-average.sh
+.ir-tools-venv/
+
+# Generated outputs
+*.wav
+*.png
+__pycache__/
