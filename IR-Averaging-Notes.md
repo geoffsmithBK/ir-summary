@@ -147,3 +147,30 @@ Options: `-o PATH` / `--name BASENAME` (one required), `--exclude SUBSTR`
 `--filter SUBSTRING`, `--plot`, one of `--bright` / `--dark` / `--mids`,
 `--low-hz HZ` (default 250), `--high-hz HZ` (default 5000),
 `--margin-db DB` (bright/dark default 0; mids default = cohort tilt std).
+
+## Design reflections & possible refinements
+
+Decisions we made deliberately, and where they could bend later:
+
+- **Why magnitude-average is the default.** Summing IRs in the time domain
+  cancels wherever phases disagree. Averaging magnitudes and rebuilding a
+  minimum-phase IR sidesteps that entirely and yields the truest *tonal*
+  center-of-gravity — which is the whole point of a "summary." `timealign`
+  stays available when you specifically want a real captured waveform.
+- **Why selection is one tilt axis, not separate treble/bass knobs.** "Dark"
+  is perceptually a *lack of treble relative to lows*, so `tilt = highs − lows`
+  unifies "less treble" and "more bass" into a single, monotonic axis. That's
+  what makes `--bright` / `--dark` / `--mids` clean opposites/center rather than
+  three unrelated filters, and it's robust to the packs being peak- (not
+  loudness-) normalized.
+- **Brick-wall tilt bands (known limitation).** `--low-hz` / `--high-hz` are
+  hard edges, so a single resonant peak parked right on an edge can swing an
+  IR's tilt more than feels fair. If that ever bites, the fix is a softer
+  measure — spectral **centroid**, or a smooth shelf weighting instead of hard
+  band integration. Predictable hard edges were the right call for now.
+- **Single-candidate short-circuit as a feature, not an error.** When a
+  selection narrows to one IR, the honest answer is "don't average — just use
+  this file," so the tool says exactly that and writes nothing.
+- **Open ideas not yet built:** loudness/RMS normalization option (vs peak);
+  a batch mode that emits bright/dark/mids summaries for a folder in one pass;
+  optional CSV of per-IR tilt/level metrics for offline sorting.
