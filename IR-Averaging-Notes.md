@@ -27,16 +27,36 @@ close mic + "Distant 24in"), because the later arrival is a big time offset.
 3. **Power/RMS averaging** (`--weighting power`) — average magnitude² then sqrt;
    slightly favors the louder/brighter mics ("loudest common voice").
 
-### Trimming the cohort before averaging
+### Selecting a sub-cohort by spectral tilt
 
-The plain average can be "too representative" — dull mics drag the summary down.
-`--bright` measures each IR's energy from `--treble-hz` (default 5000) up to
-Nyquist, takes the cohort mean, and **drops any IR below it** before averaging,
-so the summary reflects the brighter half of the pack. Tune the bar with
-`--treble-margin-db` (positive = drop more, negative = keep more). The tool
-prints each file's treble level in dB and which were kept/dropped; on the plot,
-dropped IRs are dashed blue and the cutoff is marked. (A mirror `--dark` flag is
-planned to keep the darker-than-average half.)
+The plain average can be "too representative" — extreme members pull the summary
+toward the middle. You can instead average only one region of the pack's
+**brightness axis**, defined by *spectral tilt*:
+
+```
+tilt(IR) = level(above --high-hz)  −  level(below --low-hz)     [dB]
+```
+
+with defaults `--high-hz 5000`, `--low-hz 250` (mids ignored — they don't decide
+bright/dark). Tilt rolls *both* instincts into one number: an IR is "dark" by
+having weak highs **or** strong lows. Because it's a highs-minus-lows ratio it's
+also robust to these packs being peak- (not loudness-) normalized. Pick **at most
+one** region:
+
+- `--bright` — keep IRs with tilt ≥ cohort mean + margin (the brighter half)
+- `--dark`   — keep IRs with tilt ≤ cohort mean − margin (the darker half)
+- `--mids`   — keep IRs within ± margin of the mean tilt (trims *both* extremes)
+
+`--margin-db` sets the bar: for bright/dark it defaults to 0 (split at the mean),
+positive keeps fewer; for mids it's the half-width of the kept band and defaults
+to the cohort tilt's standard deviation. The tool prints each IR's tilt and the
+keep/drop decision; on the plot, dropped IRs are dashed and the two band edges
+are marked.
+
+**Single-candidate short-circuit:** if the selection leaves exactly one IR, there
+is nothing to average — the tool writes nothing and instead names that single
+best-fit file so you can use it directly. (Zero matches → it tells you to loosen
+`--margin-db`.)
 
 ## Practical findings on the JBL E120-8 pack
 
@@ -110,8 +130,12 @@ python3 ir_average.py --dir "../Newer IRs/SOME OTHER CAB" --filter "Cone" -o "ou
 # drop the summary straight into the pack folder with a chosen name (safe to re-run):
 python3 ir_average.py --dir "../Newer IRs/SOME OTHER CAB" --name "SOME OTHER CAB - Summary" --plot
 
-# brightest half of a pack (drop below-average treble), excluding old summaries:
+# brighter half of a pack (tilt-based), excluding old summaries:
 python3 ir_average.py --dir "../Newer IRs/SOME OTHER CAB" --bright --exclude AVG --name "SOME OTHER CAB - Bright" --plot
+
+# darker half, or the central (least-extreme) cluster:
+python3 ir_average.py --dir "../Newer IRs/SOME OTHER CAB" --dark --name "SOME OTHER CAB - Dark" --plot
+python3 ir_average.py --dir "../Newer IRs/SOME OTHER CAB" --mids --name "SOME OTHER CAB - Mids" --plot
 
 # hand-picked files:
 python3 ir_average.py "a.wav" "b.wav" "c.wav" -o "out - AVG.wav"
@@ -120,5 +144,6 @@ python3 ir_average.py "a.wav" "b.wav" "c.wav" -o "out - AVG.wav"
 Options: `-o PATH` / `--name BASENAME` (one required), `--exclude SUBSTR`
 (repeatable), `--method {magnitude,timealign}`, `--weighting {linear,power}`,
 `--length N` (output samples, 0 = match inputs), `--norm dBFS` (default -0.2),
-`--filter SUBSTRING`, `--plot`, `--bright`, `--treble-hz HZ` (default 5000),
-`--treble-margin-db DB` (default 0).
+`--filter SUBSTRING`, `--plot`, one of `--bright` / `--dark` / `--mids`,
+`--low-hz HZ` (default 250), `--high-hz HZ` (default 5000),
+`--margin-db DB` (bright/dark default 0; mids default = cohort tilt std).

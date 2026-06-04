@@ -98,12 +98,20 @@ def main():
     ap.add_argument("--exclude", action="append", metavar="SUBSTR",
                     help="skip input files whose name contains SUBSTR (repeatable)")
     ap.add_argument("--plot", action="store_true", help="also write a PNG magnitude-response comparison")
+    # ---- cohort selection by spectral tilt = level(highs) - level(lows); pick at most one ----
     ap.add_argument("--bright", action="store_true",
-                    help="before averaging, drop IRs whose treble energy (>= --treble-hz) is below the cohort average")
-    ap.add_argument("--treble-hz", type=float, default=5000.0,
-                    help="low edge of the treble band used by --bright (default 5000)")
-    ap.add_argument("--treble-margin-db", type=float, default=0.0,
-                    help="--bright bar = cohort mean + margin; positive drops more, negative keeps more (default 0)")
+                    help="keep only IRs tilted brighter than the cohort average (tilt >= mean + margin)")
+    ap.add_argument("--dark", action="store_true",
+                    help="keep only IRs tilted darker than the cohort average (tilt <= mean - margin)")
+    ap.add_argument("--mids", action="store_true",
+                    help="keep only IRs near the cohort-average tilt (|tilt - mean| <= margin); trims both extremes")
+    ap.add_argument("--low-hz", type=float, default=250.0,
+                    help="upper edge of the LOW band for the tilt measure (default 250)")
+    ap.add_argument("--high-hz", type=float, default=5000.0,
+                    help="lower edge of the HIGH band for the tilt measure (default 5000)")
+    ap.add_argument("--margin-db", type=float, default=None,
+                    help="selection bar in dB. bright/dark: default 0 (split at mean), positive keeps fewer. "
+                         "mids: half-width of the kept center band, default = cohort tilt std")
     args = ap.parse_args()
 
     # resolve output path: -o is a full path; --name is a base filename placed in
@@ -167,29 +175,50 @@ def main():
         xa, lag = align_to_ref(x, ref)
         aligned.append(xa); lags.append(lag)
 
-    # ---- optional cohort trimming: drop IRs below the average treble energy ----
-    dropped = []  # (name, aligned_signal, level_db) for plotting
-    if args.bright:
-        levels = np.array([band_level_db(x, sr, args.treble_hz) for x in aligned])
-        mean_db = float(levels.mean())
-        bar = mean_db + args.treble_margin_db
-        print(f"Treble screen: band >= {args.treble_hz:.0f} Hz, cohort mean = {mean_db:+.2f} dB"
-              + ("" if args.treble_margin_db == 0 else f", bar = {bar:+.2f} dB"))
+    # ---- optional cohort selection by spectral tilt (highs vs lows) ----
+    dropped = []  # (name, aligned_signal, tilt_db) for plotting
+    mode = next((m for m in ("bright", "dark", "mids") if getattr(args, m)), None)
+    if sum(bool(getattr(args, m)) for m in ("bright", "dark", "mids")) > 1:
+        sys.exit("Choose at most one of --bright / --dark / --mids.")
+    if mode:
+        tilts = np.array([band_level_db(x, sr, args.high_hz) - band_level_db(x, sr, 0, args.low_hz)
+                          for x in aligned])
+        mean_t = float(tilts.mean())
+        if args.margin_db is not None:
+            margin = args.margin_db
+        else:
+            margin = float(tilts.std()) if mode == "mids" else 0.0
+        if mode == "bright":
+            keep_mask = tilts >= mean_t + margin
+            rule = f">= mean + {margin:.2f}"
+        elif mode == "dark":
+            keep_mask = tilts <= mean_t - margin
+            rule = f"<= mean - {margin:.2f}"
+        else:  # mids
+            keep_mask = np.abs(tilts - mean_t) <= margin
+            rule = f"within +/- {margin:.2f}"
+        print(f"Tilt screen [{mode}]: tilt = L(>{args.high_hz:.0f}Hz) - L(<{args.low_hz:.0f}Hz); "
+              f"cohort mean = {mean_t:+.2f} dB; keep tilt {rule} dB")
         keep = []
         for i, f in enumerate(files):
-            tag = "keep" if levels[i] >= bar else "DROP"
-            print(f"  [{tag}] {os.path.basename(f):55} {levels[i]:+.2f} dB")
-            if levels[i] >= bar:
+            tag = "keep" if keep_mask[i] else "drop"
+            print(f"  [{tag}] {os.path.basename(f):55} tilt={tilts[i]:+.2f} dB")
+            if keep_mask[i]:
                 keep.append(i)
             else:
-                dropped.append((os.path.basename(f), aligned[i], levels[i]))
-        if len(keep) < 2:
-            sys.exit(f"Treble screen left {len(keep)} file(s); need >= 2. "
-                     f"Loosen with a negative --treble-margin-db or a different --treble-hz.")
+                dropped.append((os.path.basename(f), aligned[i], tilts[i]))
+        n_keep = len(keep)
+        if n_keep == 0:
+            sys.exit(f"\nNo IRs matched --{mode} (margin {margin:.2f} dB). Loosen --margin-db.")
+        if n_keep == 1:
+            best = files[keep[0]]
+            print(f"\nOnly one IR matches --{mode}, so there is nothing to summarize. "
+                  f"Use this single best-fit IR directly:\n  {best}")
+            return
         files   = [files[i]   for i in keep]
         aligned = [aligned[i] for i in keep]
         lags    = [lags[i]    for i in keep]
-        print(f"  -> averaging {len(keep)} of {len(keep) + len(dropped)} IRs\n")
+        print(f"  -> averaging {n_keep} of {len(keep_mask)} IRs\n")
 
     WARN_SHIFT = 50  # samples (~1 ms @ 48k); larger usually means a distant/rear mic snuck in
     print(f"Averaging {len(files)} IRs @ {sr} Hz, method={args.method}, weighting={args.weighting}")
@@ -249,12 +278,13 @@ def main():
             m = np.abs(np.fft.rfft(x, N))
             ax.semilogx(freqs, 20 * np.log10(np.maximum(m, 1e-9)) - ref_db,
                         color="steelblue", lw=1.0, ls="--",
-                        label="dropped (low treble)" if j == 0 else None)
+                        label=f"dropped (--{mode})" if j == 0 else None)
         ax.semilogx(freqs, 20 * np.log10(np.maximum(mo, 1e-9)) - ref_db,
                     color="crimson", lw=2.2, label="AVERAGE")
-        if args.bright:
-            ax.axvline(args.treble_hz, color="darkorange", lw=1.0, ls=":",
-                       label=f"treble cutoff {args.treble_hz:.0f} Hz")
+        if mode:
+            ax.axvline(args.low_hz, color="darkorange", lw=1.0, ls=":",
+                       label=f"tilt bands: <{args.low_hz:.0f} / >{args.high_hz:.0f} Hz")
+            ax.axvline(args.high_hz, color="darkorange", lw=1.0, ls=":")
         ax.set_xlim(20, sr / 2); ax.set_ylim(-40, 6)
         # readable, non-exponential frequency ticks
         ticks = [t for t in (20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000) if t <= sr / 2]
