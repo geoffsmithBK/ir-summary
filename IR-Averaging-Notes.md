@@ -74,8 +74,7 @@ best-fit file so you can use it directly. (Zero matches → it tells you to loos
 
 ## The tool: `ir_average.py`
 
-Lives in its own git repo at
-`/Users/gsmith/Desktop/Speaker IR Archive/ir_average/` alongside `run-average.sh`
+Lives in its own git repo alongside `run-average.sh`
 and this file. Uses numpy / scipy / soundfile / matplotlib in a `.ir-tools-venv`
 venv that `run-average.sh` creates inside the repo on first run (gitignored).
 A separate, now-orphaned `.ir-tools-venv` may still sit at the archive root from
