@@ -8,6 +8,8 @@ import { averageIRs } from './dsp.js';
 import { deriveOutputName } from './naming.js';
 import { drawPlot } from './plot.js';
 import { resample } from './resample.js';
+import { createInfoTooltip, openModal } from './popover.js';
+import { TILT_TOOLTIP_COPY, WHY_MODAL_COPY } from './copy.js';
 
 const el = (id) => document.getElementById(id);
 const dropzone = el('dropzone');
@@ -233,3 +235,14 @@ saveBtn.addEventListener('click', save);
 
 // controls are useful before the first drop too (they apply live after it)
 controls.classList.remove('hidden');
+
+// info tooltip + "why?" modal
+const modeTooltipSlot = el('mode-tooltip-slot');
+modeTooltipSlot?.replaceWith(
+    createInfoTooltip(TILT_TOOLTIP_COPY, { label: 'About voicing selection' })
+);
+
+const whyLink = el('why-link');
+whyLink?.addEventListener('click', () => {
+    openModal(WHY_MODAL_COPY, { title: 'Why SumIR?', triggerEl: whyLink });
+});
