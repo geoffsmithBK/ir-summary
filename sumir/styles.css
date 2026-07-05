@@ -1,0 +1,510 @@
+/* SumIR — dark instrument-panel theme.
+   Palette: warm charcoal panels, off-white text, pilot-lamp amber accent.
+   Type: Chakra Petch (wordmark) / IBM Plex Sans (UI) / IBM Plex Mono (values). */
+
+:root {
+    --bg: #131417;
+    --panel: #1c1e22;
+    --inset: #16171a;
+    --border: #2b2e35;
+    --border-soft: #23262c;
+    --text: #e8e5dc;
+    --muted: #97938a;
+    --accent: #dfa64f;
+    --accent-bright: #edbd6e;
+    --accent-ink: #1c1305;
+    --danger: #e0685c;
+    --ok: #9dbb7a;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --font-ui: "IBM Plex Sans", -apple-system, system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+    --font-display: "Chakra Petch", var(--font-ui);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-ui);
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--text);
+    background:
+        radial-gradient(1100px 500px at 50% -10%, #1a1c20 0%, var(--bg) 60%)
+        var(--bg);
+    min-height: 100vh;
+}
+
+.shell {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 44px 22px 28px;
+}
+
+/* ---- header ---- */
+header {
+    margin-bottom: 26px;
+}
+
+.wordmark {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 2rem;
+    letter-spacing: 0.06em;
+    color: var(--text);
+}
+
+.wordmark::after {
+    content: "";
+    display: inline-block;
+    width: 0.55em;
+    height: 0.55em;
+    margin-left: 0.45em;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, var(--accent-bright), var(--accent) 55%, #6e4d1d);
+    box-shadow: 0 0 10px rgba(223, 166, 79, 0.55);
+    vertical-align: 6%;
+}
+
+.tagline {
+    color: var(--muted);
+    margin-top: 4px;
+}
+
+/* ---- panels (fieldset sections) ---- */
+.panel {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 22px;
+    margin-bottom: 22px;
+    background: var(--panel);
+}
+
+.panel > legend {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0 9px;
+    margin-left: 8px;
+}
+
+/* ---- dropzone / speaker ---- */
+.dropzone {
+    display: flex;
+    align-items: center;
+    gap: 26px;
+    padding: 10px 6px;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+}
+
+#file-input {
+    display: none;
+}
+
+.speaker {
+    flex: 0 0 auto;
+    width: 128px;
+    height: 128px;
+    border-radius: 50%;
+    background: var(--inset);
+    border: 1px solid var(--border);
+    display: grid;
+    place-items: center;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+.speaker-cone {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 38% 32%, #26282d 0%, #1a1b1f 55%, #131417 100%);
+    border: 1px solid var(--border-soft);
+    display: grid;
+    place-items: center;
+}
+
+.speaker-cap {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 36% 30%, #33363c, #1e2024 70%);
+    border: 1px solid var(--border);
+    transition: background 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.dropzone:hover .speaker,
+.dropzone.dragover .speaker {
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+
+.dropzone.dragover .speaker {
+    box-shadow: 0 0 0 4px rgba(223, 166, 79, 0.12);
+}
+
+.dropzone:hover .speaker-cap,
+.dropzone.dragover .speaker-cap {
+    background: radial-gradient(circle at 36% 30%, var(--accent-bright), var(--accent) 60%, #6e4d1d);
+    border-color: var(--accent);
+    box-shadow: 0 0 16px rgba(223, 166, 79, 0.45);
+}
+
+.dropzone-copy {
+    flex: 1;
+}
+
+.drop-lead {
+    font-size: 1.06rem;
+    font-weight: 500;
+    margin-bottom: 12px;
+}
+
+.file-types {
+    margin-top: 12px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--muted);
+}
+
+/* ---- buttons ---- */
+.btn {
+    font-family: var(--font-ui);
+    font-size: 0.95rem;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    padding: 9px 18px;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.btn-quiet {
+    background: var(--inset);
+    color: var(--text);
+    border: 1px solid var(--border);
+}
+
+.btn-quiet:hover {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    color: var(--accent-bright);
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: var(--accent-ink);
+    border: 1px solid var(--accent);
+}
+
+.btn-primary:hover {
+    background: var(--accent-bright);
+    border-color: var(--accent-bright);
+}
+
+.btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+/* ---- voicing controls ---- */
+.mode-controls {
+    display: inline-flex;
+    background: var(--inset);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 3px;
+    gap: 2px;
+}
+
+.mode-controls label {
+    cursor: pointer;
+}
+
+.mode-controls input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.mode-controls span {
+    display: inline-block;
+    padding: 7px 20px;
+    border-radius: 6px;
+    font-size: 0.92rem;
+    font-weight: 500;
+    color: var(--muted);
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.mode-controls label:hover span {
+    color: var(--text);
+}
+
+.mode-controls input:checked + span {
+    background: var(--panel);
+    color: var(--accent-bright);
+    box-shadow: inset 0 0 0 1px var(--border);
+}
+
+.mode-controls input:focus-visible + span {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.mode-hint {
+    margin-top: 10px;
+    font-size: 0.83rem;
+    color: var(--muted);
+}
+
+/* ---- advanced disclosure ---- */
+.advanced {
+    margin-top: 18px;
+    border-top: 1px solid var(--border-soft);
+    padding-top: 14px;
+}
+
+.advanced summary {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+}
+
+.advanced summary::-webkit-details-marker {
+    display: none;
+}
+
+.advanced summary::before {
+    content: "▸";
+    display: inline-block;
+    margin-right: 8px;
+    transition: transform 0.15s ease;
+}
+
+.advanced[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.advanced summary:hover {
+    color: var(--text);
+}
+
+.advanced-options {
+    margin-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 14px 18px;
+}
+
+.option-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.option-group label {
+    font-size: 0.8rem;
+    color: var(--muted);
+}
+
+/* ---- fields ---- */
+select,
+input[type="number"] {
+    font-family: var(--font-ui);
+    font-size: 0.92rem;
+    color: var(--text);
+    background: var(--inset);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    appearance: none;
+}
+
+select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2397938a' fill='none' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+}
+
+select:hover,
+input[type="number"]:hover {
+    border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+
+select:focus-visible,
+input[type="number"]:focus-visible,
+.btn:focus-visible,
+.advanced summary:focus-visible,
+.dropzone:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+input[type="number"]::placeholder {
+    color: color-mix(in srgb, var(--muted) 70%, transparent);
+}
+
+/* ---- notices ---- */
+.notice {
+    border-radius: var(--radius);
+    padding: 18px 22px;
+    margin-bottom: 22px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+}
+
+.processing {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    color: var(--muted);
+}
+
+.spinner {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.error {
+    border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+}
+
+.error p {
+    color: var(--danger);
+}
+
+.single-candidate {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.single-candidate p + p {
+    margin-top: 6px;
+    color: var(--muted);
+}
+
+.single-candidate .mono {
+    color: var(--accent-bright);
+}
+
+.mono {
+    font-family: var(--font-mono);
+    font-size: 0.88rem;
+}
+
+/* ---- output ---- */
+.plot-container {
+    margin-bottom: 16px;
+}
+
+#plot-canvas {
+    display: block;
+    width: 100%;
+    height: 420px;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius-sm);
+    background-color: var(--inset);
+}
+
+.output-row {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+#output-filename {
+    color: var(--accent-bright);
+    overflow-wrap: anywhere;
+}
+
+.output-format {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* ---- footer ---- */
+footer {
+    text-align: center;
+    padding-top: 6px;
+}
+
+footer p {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+}
+
+/* ---- utility ---- */
+.hidden {
+    display: none !important;
+}
+
+/* ---- responsive ---- */
+@media (max-width: 560px) {
+    .shell {
+        padding: 28px 14px 20px;
+    }
+
+    .dropzone {
+        flex-direction: column;
+        text-align: center;
+        gap: 18px;
+    }
+
+    .mode-controls {
+        display: flex;
+    }
+
+    .mode-controls label {
+        flex: 1;
+    }
+
+    .mode-controls span {
+        display: block;
+        text-align: center;
+        padding: 7px 0;
+    }
+
+    #plot-canvas {
+        height: 300px;
+    }
+
+    .output-row,
+    .output-format {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .output-format .btn {
+        width: 100%;
+    }
+}
+
+/* ---- reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        transition: none !important;
+        animation-duration: 1.5s !important;
+    }
+}
