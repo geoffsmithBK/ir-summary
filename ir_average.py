@@ -51,11 +51,10 @@ def align_to_ref(x, ref):
     return x, lag
 
 
-def minimum_phase_from_mag(mag):
-    """Build a minimum-phase impulse response from a magnitude spectrum.
-    mag is the full (two-sided) magnitude of length N. Uses the real-cepstrum
-    method: a min-phase signal has its log-magnitude and phase as a
-    Hilbert-transform pair."""
+def minimum_phase_spectrum(mag):
+    """Minimum-phase transfer function (complex, full two-sided) for a
+    magnitude spectrum of length N. Uses the real-cepstrum method: a min-phase
+    signal has its log-magnitude and phase as a Hilbert-transform pair."""
     N = len(mag)
     log_mag = np.log(np.maximum(mag, 1e-12))
     cep = np.fft.ifft(log_mag).real           # real cepstrum
@@ -65,9 +64,28 @@ def minimum_phase_from_mag(mag):
     if N % 2 == 0:
         w[N // 2] = 1.0
     # odd N: leave the single midpoint at default (covered above)
-    H = np.exp(np.fft.fft(cep * w))
-    h = np.fft.ifft(H).real
-    return h
+    return np.exp(np.fft.fft(cep * w))
+
+
+def minimum_phase_from_mag(mag):
+    """Build a minimum-phase impulse response from a magnitude spectrum."""
+    return np.fft.ifft(minimum_phase_spectrum(mag)).real
+
+
+def butterworth_band_mag(freqs, highpass=None, lowpass=None):
+    """Combined magnitude response of a 3rd-order (18 dB/oct) Butterworth
+    high-pass and/or 2nd-order (12 dB/oct) low-pass, sampled at |freqs|.
+    Analytic (analog-prototype) response, -3 dB at each corner — no
+    bilinear-transform warping near Nyquist."""
+    f = np.abs(freqs)
+    g = np.ones_like(f)
+    if highpass:
+        r = f / highpass
+        g *= r ** 3 / np.sqrt(1.0 + r ** 6)
+    if lowpass:
+        r = f / lowpass
+        g /= np.sqrt(1.0 + r ** 4)
+    return g
 
 
 def band_level_db(x, sr, lo, hi=None):
@@ -98,6 +116,11 @@ def main():
     ap.add_argument("--exclude", action="append", metavar="SUBSTR",
                     help="skip input files whose name contains SUBSTR (repeatable)")
     ap.add_argument("--plot", action="store_true", help="also write a PNG magnitude-response comparison")
+    # ---- optional band-shaping of the summary (for black-box IR loaders) ----
+    ap.add_argument("--highpass", type=float, default=None, metavar="HZ",
+                    help="18 dB/oct Butterworth high-pass at HZ, applied to the summary (min-phase, -3 dB at HZ)")
+    ap.add_argument("--lowpass", type=float, default=None, metavar="HZ",
+                    help="12 dB/oct Butterworth low-pass at HZ, applied to the summary (min-phase, -3 dB at HZ)")
     # ---- cohort selection by spectral tilt = level(highs) - level(lows); pick at most one ----
     ap.add_argument("--bright", action="store_true",
                     help="keep only IRs tilted brighter than the cohort average (tilt >= mean + margin)")
@@ -113,6 +136,12 @@ def main():
                     help="selection bar in dB. bright/dark: default 0 (split at mean), positive keeps fewer. "
                          "mids: half-width of the kept center band, default = cohort tilt std")
     args = ap.parse_args()
+
+    for flag, val in (("--highpass", args.highpass), ("--lowpass", args.lowpass)):
+        if val is not None and val <= 0:
+            sys.exit(f"{flag} must be a positive frequency in Hz.")
+    if args.highpass is not None and args.lowpass is not None and args.highpass >= args.lowpass:
+        sys.exit(f"--highpass ({args.highpass:g} Hz) must be below --lowpass ({args.lowpass:g} Hz).")
 
     # resolve output path: -o is a full path; --name is a base filename placed in
     # the folder being summarized (or cwd). exactly one is required.
@@ -161,6 +190,9 @@ def main():
     if len(set(srs)) != 1:
         sys.exit(f"Sample-rate mismatch across files: {set(srs)}")
     sr = srs[0]
+    for flag, val in (("--highpass", args.highpass), ("--lowpass", args.lowpass)):
+        if val is not None and val >= sr / 2:
+            sys.exit(f"{flag} ({val:g} Hz) must be below Nyquist ({sr / 2:g} Hz).")
 
     # pad to common length
     L = max(len(x) for x in sigs)
@@ -235,8 +267,25 @@ def main():
         for name, lag in flagged:
             print(f"    {name}  (shift={lag:+d})")
 
+    # optional Butterworth band-shaping (applied to the summary, min-phase so
+    # there's no pre-ringing or added latency). out_pre keeps the unfiltered
+    # average for the plot's ghost curve.
+    filtering = bool(args.highpass or args.lowpass)
+    out_pre = None
+    if filtering:
+        band_gain = butterworth_band_mag(np.fft.fftfreq(L, 1 / sr), args.highpass, args.lowpass)
+        parts = []
+        if args.highpass:
+            parts.append(f"high-pass {args.highpass:g} Hz (18 dB/oct)")
+        if args.lowpass:
+            parts.append(f"low-pass {args.lowpass:g} Hz (12 dB/oct)")
+        print(f"Filters: {', '.join(parts)}  [min-phase Butterworth, -3 dB at corner]")
+
     if args.method == "timealign":
         out = np.mean(aligned, axis=0)
+        if filtering:
+            out_pre = out
+            out = np.fft.ifft(np.fft.fft(out) * minimum_phase_spectrum(band_gain)).real
     else:
         N = L
         mags = []
@@ -248,60 +297,87 @@ def main():
             avg_mag = np.sqrt(np.mean(mags ** 2, axis=0))
         else:
             avg_mag = np.mean(mags, axis=0)
+        if filtering:
+            out_pre = minimum_phase_from_mag(avg_mag)
+            avg_mag = avg_mag * band_gain
         out = minimum_phase_from_mag(avg_mag)
 
-    # peak-normalize
+    # peak-normalize (after filtering, so dumping out-of-band energy buys
+    # headroom); the ghost gets the same scalar so passbands overlay on the plot
     peak = np.max(np.abs(out))
     if peak > 0:
         target = 10 ** (args.norm / 20.0)
         out = out * (target / peak)
+        if out_pre is not None:
+            out_pre = out_pre * (target / peak)
 
     sf.write(out_path, out.astype(np.float32), sr, subtype="PCM_24")
     print(f"\nWrote {out_path}  ({len(out)} samples, 24-bit, {sr} Hz)")
 
     if args.plot:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        from matplotlib.ticker import FixedLocator, FuncFormatter
-        N = L
-        freqs = np.fft.rfftfreq(N, 1 / sr)
-        mo = np.abs(np.fft.rfft(out, N))
-        ref_db = 20 * np.log10(np.maximum(mo.max(), 1e-9))  # put average peak at 0 dB
-        fig, ax = plt.subplots(figsize=(11, 6))
-        for f, x in zip(files, aligned):
-            m = np.abs(np.fft.rfft(x, N))
-            ax.semilogx(freqs, 20 * np.log10(np.maximum(m, 1e-9)) - ref_db,
-                        color="0.72", lw=0.8)
-        # dropped IRs (if any) as dashed blue so you can see what was excluded
-        for j, (name, x, lvl) in enumerate(dropped):
-            m = np.abs(np.fft.rfft(x, N))
-            ax.semilogx(freqs, 20 * np.log10(np.maximum(m, 1e-9)) - ref_db,
-                        color="steelblue", lw=1.0, ls="--",
-                        label=f"dropped (--{mode})" if j == 0 else None)
-        ax.semilogx(freqs, 20 * np.log10(np.maximum(mo, 1e-9)) - ref_db,
-                    color="crimson", lw=2.2, label="AVERAGE")
-        if mode:
-            ax.axvline(args.low_hz, color="darkorange", lw=1.0, ls=":",
-                       label=f"tilt bands: <{args.low_hz:.0f} / >{args.high_hz:.0f} Hz")
-            ax.axvline(args.high_hz, color="darkorange", lw=1.0, ls=":")
-        ax.set_xlim(20, sr / 2); ax.set_ylim(-40, 6)
-        # readable, non-exponential frequency ticks
-        ticks = [t for t in (20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000) if t <= sr / 2]
-        ax.xaxis.set_major_locator(FixedLocator(ticks))
-        ax.xaxis.set_minor_locator(FixedLocator([]))  # no minor ticks/labels
-        ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{int(v):,}"))
-        ax.grid(True, which="major", alpha=0.3)
-        ax.set_xlabel("Hz"); ax.set_ylabel("dB")
-        n_kept = len(files)
-        title = f"{os.path.basename(out_path)} — {n_kept} IRs (grey) vs average (red)"
-        if dropped:
-            title += f"; {len(dropped)} dropped (dashed)"
-        ax.set_title(title)
-        ax.legend()
-        png = os.path.splitext(out_path)[0] + ".png"
-        fig.tight_layout(); fig.savefig(png, dpi=110)
-        print(f"Wrote {png}")
+        # The WAV above is the real deliverable; a plot failure (missing
+        # matplotlib, unwritable PNG path) should warn, not fail the run.
+        try:
+            write_plot(out_path, out, files, aligned, dropped, mode, args, sr, L, out_pre)
+        except Exception as e:
+            print(f"WARNING: could not write plot: {e}", file=sys.stderr)
+
+
+def write_plot(out_path, out, files, aligned, dropped, mode, args, sr, L, out_pre=None):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import FixedLocator, FuncFormatter
+    N = L
+    freqs = np.fft.rfftfreq(N, 1 / sr)
+    mo = np.abs(np.fft.rfft(out, N))
+    ref_db = 20 * np.log10(np.maximum(mo.max(), 1e-9))  # put average peak at 0 dB
+    fig, ax = plt.subplots(figsize=(11, 6))
+    for f, x in zip(files, aligned):
+        m = np.abs(np.fft.rfft(x, N))
+        ax.semilogx(freqs, 20 * np.log10(np.maximum(m, 1e-9)) - ref_db,
+                    color="0.72", lw=0.8)
+    # dropped IRs (if any) as dashed blue so you can see what was excluded
+    for j, (name, x, lvl) in enumerate(dropped):
+        m = np.abs(np.fft.rfft(x, N))
+        ax.semilogx(freqs, 20 * np.log10(np.maximum(m, 1e-9)) - ref_db,
+                    color="steelblue", lw=1.0, ls="--",
+                    label=f"dropped (--{mode})" if j == 0 else None)
+    # pre-filter average as a ghost, so you can see what the filters removed
+    if out_pre is not None:
+        mp = np.abs(np.fft.rfft(out_pre, N))
+        ax.semilogx(freqs, 20 * np.log10(np.maximum(mp, 1e-9)) - ref_db,
+                    color="crimson", lw=1.4, ls="--", alpha=0.35,
+                    label="average (pre-filter)")
+    ax.semilogx(freqs, 20 * np.log10(np.maximum(mo, 1e-9)) - ref_db,
+                color="crimson", lw=2.2, label="AVERAGE")
+    if args.highpass or args.lowpass:
+        corners = [f for f in (args.highpass, args.lowpass) if f]
+        fl_label = " / ".join(f"{'HP' if f == args.highpass else 'LP'} {f:g} Hz" for f in corners)
+        for i, f in enumerate(corners):
+            ax.axvline(f, color="teal", lw=1.0, ls="--",
+                       label=f"filters: {fl_label}" if i == 0 else None)
+    if mode:
+        ax.axvline(args.low_hz, color="darkorange", lw=1.0, ls=":",
+                   label=f"tilt bands: <{args.low_hz:.0f} / >{args.high_hz:.0f} Hz")
+        ax.axvline(args.high_hz, color="darkorange", lw=1.0, ls=":")
+    ax.set_xlim(20, sr / 2); ax.set_ylim(-40, 6)
+    # readable, non-exponential frequency ticks
+    ticks = [t for t in (20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000) if t <= sr / 2]
+    ax.xaxis.set_major_locator(FixedLocator(ticks))
+    ax.xaxis.set_minor_locator(FixedLocator([]))  # no minor ticks/labels
+    ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{int(v):,}"))
+    ax.grid(True, which="major", alpha=0.3)
+    ax.set_xlabel("Hz"); ax.set_ylabel("dB")
+    n_kept = len(files)
+    title = f"{os.path.basename(out_path)} — {n_kept} IRs (grey) vs average (red)"
+    if dropped:
+        title += f"; {len(dropped)} dropped (dashed)"
+    ax.set_title(title)
+    ax.legend()
+    png = os.path.splitext(out_path)[0] + ".png"
+    fig.tight_layout(); fig.savefig(png, dpi=110)
+    print(f"Wrote {png}")
 
 
 if __name__ == "__main__":
