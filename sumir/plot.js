@@ -10,6 +10,28 @@ const TICKS = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
 const Y_MIN = -40;
 const Y_MAX = 6;
 
+const TITLE_FONT = '600 12px "IBM Plex Mono", ui-monospace, monospace';
+const TITLE_LINE_H = 15;
+
+// Greedy word-wrap so long titles (filter tags, dropped counts) aren't
+// clipped at the canvas edges; the top margin grows per extra line.
+function wrapTitle(ctx, text, maxW) {
+    ctx.font = TITLE_FONT;
+    const lines = [];
+    let line = '';
+    for (const word of text.split(' ')) {
+        const candidate = line ? `${line} ${word}` : word;
+        if (line && ctx.measureText(candidate).width > maxW) {
+            lines.push(line);
+            line = word;
+        } else {
+            line = candidate;
+        }
+    }
+    if (line) lines.push(line);
+    return lines;
+}
+
 function dbCurve(x, N, sr) {
     const mag = magnitudeSpectrum(x, N);
     const half = N / 2;
@@ -62,7 +84,8 @@ export function drawPlot(canvas, {
         filter: '#63b3a4',
     };
 
-    const margin = { left: 46, right: 12, top: 30, bottom: 34 };
+    const titleLines = wrapTitle(ctx, title, cssW - 24);
+    const margin = { left: 46, right: 12, top: 16 + TITLE_LINE_H * titleLines.length, bottom: 34 };
     const plotW = cssW - margin.left - margin.right;
     const plotH = cssH - margin.top - margin.bottom;
     const fMin = 20;
@@ -174,9 +197,11 @@ export function drawPlot(canvas, {
 
     // title + legend
     ctx.fillStyle = theme.title;
-    ctx.font = '600 12px "IBM Plex Mono", ui-monospace, monospace';
+    ctx.font = TITLE_FONT;
     ctx.textAlign = 'center';
-    ctx.fillText(title, margin.left + plotW / 2, 16);
+    titleLines.forEach((line, i) => {
+        ctx.fillText(line, margin.left + plotW / 2, 16 + TITLE_LINE_H * i);
+    });
 
     ctx.font = '11px "IBM Plex Mono", ui-monospace, monospace';
     ctx.fillStyle = theme.text;
