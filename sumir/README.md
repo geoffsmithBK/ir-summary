@@ -31,7 +31,17 @@ low-pass (12 dB/oct; 6/8/10 kHz) Butterworth filters baked into the summary —
 for IR loaders with no downstream EQ. Minimum-phase (no pre-ringing or added
 latency), −3 dB at the corner, applied before normalization. The plot shows
 the pre-filter average as a ghost, and applied filters are tagged into the
-suggested filename (e.g. "… (4 IRs, HP80 LP8k).wav").
+suggested filename (e.g. "… (4 IRs, HP80 LP8k).wav"). Each corner dropdown also
+offers **Enter value…** for an arbitrary Hz value (validated like the CLI:
+positive, HP < LP, below Nyquist).
+
+Bandpass a single IR: the **Bandpass a single IR** link under the dropzone
+switches to a single-file mode (mirrors the CLI's `--bandpassonly`). Drop one
+IR, pick a high-pass and/or low-pass corner (fixed or "Enter value…"), and save
+— the IR is filtered with the same Butterworth band applied as a minimum-phase
+filter to the original waveform (keeping its own phase/character, no averaging,
+no plot), then peak-normalized to −0.2 dBFS. The output name is the input's plus
+a filter tag (e.g. "Foo (HP80 LP8k).wav").
 
 ## Modules
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { deriveOutputName } from '../naming.js';
+import { deriveOutputName, deriveBandpassName } from '../naming.js';
 
 test('common leading tokens become the base name', () => {
     const name = deriveOutputName(
@@ -79,4 +79,22 @@ test('filter tag also lands on the fallback name', () => {
 test('single meaningless common token (e.g. a number) still works', () => {
     const name = deriveOutputName(['1 a.wav', '1 b.wav'], 'dark');
     assert.equal(name, '1 — Dark Summary (2 IRs).wav');
+});
+
+// ---- deriveBandpassName (single-IR bandpass-only flow) ----
+test('bandpass name appends both filter tags to the basename', () => {
+    assert.equal(deriveBandpassName('Foo.wav', { highpass: 80, lowpass: 8000 }), 'Foo (HP80 LP8k).wav');
+});
+
+test('bandpass name with a single filter', () => {
+    assert.equal(deriveBandpassName('My IR.wav', { highpass: 120 }), 'My IR (HP120).wav');
+    assert.equal(deriveBandpassName('My IR.wav', { lowpass: 6000 }), 'My IR (LP6k).wav');
+});
+
+test('bandpass name with no filters just re-suffixes .wav', () => {
+    assert.equal(deriveBandpassName('Foo.wav', {}), 'Foo.wav');
+});
+
+test('bandpass name keeps fractional-k tags', () => {
+    assert.equal(deriveBandpassName('Cab.wav', { lowpass: 6500 }), 'Cab (LP6.5k).wav');
 });

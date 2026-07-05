@@ -284,6 +284,77 @@ function fftBinFreqs(N, sr) {
 }
 
 /**
+ * Validate high/low-pass corners against the CLI's rules (parity with the
+ * ir_average.py checks): positive, high-pass below low-pass, each below
+ * Nyquist. Throws on the first violation. A null corner means "not applied".
+ */
+export function validateCorners(highpass, lowpass, sr) {
+    for (const [label, hz] of [['High-pass', highpass], ['Low-pass', lowpass]]) {
+        if (hz === null) continue;
+        if (hz <= 0) throw new Error(`${label} must be a positive frequency in Hz.`);
+        if (hz >= sr / 2) throw new Error(`${label} (${hz} Hz) must be below Nyquist (${sr / 2} Hz).`);
+    }
+    if (highpass !== null && lowpass !== null && highpass >= lowpass) {
+        throw new Error(`High-pass (${highpass} Hz) must be below low-pass (${lowpass} Hz).`);
+    }
+}
+
+/**
+ * Peak-normalize `out` in place to `normDb` dBFS. If `alsoScale` is given it
+ * gets the SAME scalar (so a pre-filter ghost keeps its relative level).
+ */
+export function normalizeToPeak(out, normDb, alsoScale = null) {
+    let peak = 0;
+    for (const v of out) peak = Math.max(peak, Math.abs(v));
+    if (peak > 0) {
+        const scale = Math.pow(10, normDb / 20) / peak;
+        for (let i = 0; i < out.length; i++) out[i] *= scale;
+        if (alsoScale) for (let i = 0; i < alsoScale.length; i++) alsoScale[i] *= scale;
+    }
+}
+
+/**
+ * Band-shape a SINGLE IR with the Butterworth high/low-pass, preserving the
+ * IR's own phase/character. Parity with run_bandpass_only in ir_average.py:
+ * the band gain is applied as a minimum-phase spectrum multiplied onto the
+ * ORIGINAL waveform's FFT (we do NOT rebuild the IR as minimum-phase), then
+ * the result is peak-normalized to -0.2 dBFS. Runs at N = x.length (numpy grid).
+ *
+ * @param {Float64Array} x - decoded mono IR
+ * @param {number} sr
+ * @param {Object} opts
+ * @param {number|null} [opts.highpass=null] - 18 dB/oct Butterworth high-pass corner (Hz)
+ * @param {number|null} [opts.lowpass=null] - 12 dB/oct Butterworth low-pass corner (Hz)
+ * @param {boolean} [opts.normalize=true] - peak-normalize to -0.2 dBFS; false
+ *   preserves the input's original level (#9 --keep-level parity)
+ * @returns {Float64Array} filtered IR (length = x.length)
+ */
+export function bandpassIR(x, sr, opts = {}) {
+    const { highpass = null, lowpass = null, normalize = true } = opts;
+    validateCorners(highpass, lowpass, sr);
+    if (highpass === null && lowpass === null) {
+        throw new Error('Bandpass needs at least one of high-pass or low-pass.');
+    }
+    const N = x.length;
+    const bandGain = butterworthBandMag(fftBinFreqs(N, sr), highpass, lowpass);
+    const H = minimumPhaseSpectrum(bandGain);
+    const re = new Float64Array(N);
+    const im = new Float64Array(N);
+    re.set(x);
+    fftAnyN(re, im);
+    for (let i = 0; i < N; i++) {
+        const xr = re[i] * H.re[i] - im[i] * H.im[i];
+        const xi = re[i] * H.im[i] + im[i] * H.re[i];
+        re[i] = xr;
+        im[i] = xi;
+    }
+    ifftAnyN(re, im);
+    const out = re.slice(0, N);
+    if (normalize) normalizeToPeak(out, -0.2);
+    return out;
+}
+
+/**
  * Full pipeline: pad -> align -> optional tilt selection -> average ->
  * normalize. Parity with ir_average.py main().
  *
@@ -314,14 +385,7 @@ export function averageIRs(signals, sr, opts = {}) {
         lowpass = null,
     } = opts;
 
-    for (const [label, hz] of [['High-pass', highpass], ['Low-pass', lowpass]]) {
-        if (hz !== null && hz >= sr / 2) {
-            throw new Error(`${label} (${hz} Hz) must be below Nyquist (${sr / 2} Hz).`);
-        }
-    }
-    if (highpass !== null && lowpass !== null && highpass >= lowpass) {
-        throw new Error(`High-pass (${highpass} Hz) must be below low-pass (${lowpass} Hz).`);
-    }
+    validateCorners(highpass, lowpass, sr);
     const filtering = Boolean(highpass || lowpass);
 
     // pad to common length
@@ -450,15 +514,7 @@ export function averageIRs(signals, sr, opts = {}) {
 
     // peak-normalize after filtering (dumping out-of-band energy buys
     // headroom); ghost gets the same scalar so passbands overlay on the plot
-    let peak = 0;
-    for (const v of out) peak = Math.max(peak, Math.abs(v));
-    if (peak > 0) {
-        const target = Math.pow(10, normDb / 20);
-        for (let i = 0; i < out.length; i++) out[i] *= target / peak;
-        if (outPre) {
-            for (let i = 0; i < outPre.length; i++) outPre[i] *= target / peak;
-        }
-    }
+    normalizeToPeak(out, normDb, outPre);
 
     return {
         status: 'ok',

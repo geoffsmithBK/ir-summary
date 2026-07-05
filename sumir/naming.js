@@ -75,3 +75,20 @@ export function deriveOutputName(filenames, mode, countOverride, filters = {}) {
     }
     return `${common.join(' ')} — ${label} ${count}.wav`;
 }
+
+/**
+ * Output filename for the bandpass-only flow: the input basename plus a filter
+ * tag, e.g. "Foo (HP80 LP8k).wav". Uses the same hzTag conventions as
+ * deriveOutputName. With no filters it just re-suffixes ".wav".
+ *
+ * @param {string} filename - the single input file's name
+ * @param {{highpass?: number|null, lowpass?: number|null}} [filters]
+ * @returns {string} suggested output filename (.wav)
+ */
+export function deriveBandpassName(filename, filters = {}) {
+    const base = filename.replace(/\.[^.]+$/, '');
+    const tags = [];
+    if (filters.highpass) tags.push(`HP${hzTag(filters.highpass)}`);
+    if (filters.lowpass) tags.push(`LP${hzTag(filters.lowpass)}`);
+    return tags.length ? `${base} (${tags.join(' ')}).wav` : `${base}.wav`;
+}
