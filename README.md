@@ -13,14 +13,19 @@ tonal center-of-gravity of the group.
 ## What's here
 
 - **`ir_average.py`** — the command-line tool (magnitude/min-phase averaging,
-  spectral-tilt `--bright` / `--dark` / `--mids` selection, readable plots,
-  self-ingest guard, and basic cohort hygiene). See
-  **[IR-Averaging-Notes.md](IR-Averaging-Notes.md)** for the full writeup and the
-  reasoning behind the design.
+  spectral-tilt `--bright` / `--dark` / `--mids` selection, `--highpass` /
+  `--lowpass` Butterworth band-shaping (18/12 dB per octave, min-phase — handy
+  for black-box hardware IR loaders like pedal-format preamps with no
+  downstream EQ), readable plots, self-ingest guard, and basic cohort hygiene).
+  See **[IR-Averaging-Notes.md](IR-Averaging-Notes.md)** for the full writeup
+  and the reasoning behind the design.
 - **`run-average.sh`** — a zero-friction wrapper that sets up its Python venv on
   first run and forwards all arguments to the tool.
-- **`docs/superpowers/specs/`** — the design spec for the **IR Summary droplet**,
-  a client-side drag-and-drop web app port (in progress).
+- **`sumir/`** — **SumIR**, the client-side drag-and-drop web app port of the
+  tool: drop 2+ IRs, get a summary plus an in-app plot, in a dark instrument-
+  panel UI, with output format options (bit depth / sample rate) and save via
+  the native picker or download. See `sumir/README.md`.
+- **`docs/superpowers/specs/`** — the original design spec for the web app.
 
 ## Quick start (CLI)
 
@@ -35,8 +40,9 @@ first run. Full option reference and worked examples live in
 
 ## Roadmap
 
-- **Phase 1 (designed):** a minimalist client-side web *droplet* — drag 2+ IRs
-  onto a window, get a summary plus an in-app magnitude plot, with progressive
-  save and basic bit-depth / sample-rate output options.
+- **Phase 1 (done):** SumIR, the client-side web droplet — drag 2+ IRs onto
+  the page, get a summary plus an in-app magnitude plot, with save via the
+  native picker or download and bit-depth / sample-rate output options. See
+  `sumir/`.
 - **Phase 2:** audition/preview (hear the summary through a guitar DI) and
   folder-drop.

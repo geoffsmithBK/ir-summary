@@ -142,7 +142,26 @@ Options: `-o PATH` / `--name BASENAME` (one required), `--exclude SUBSTR`
 `--length N` (output samples, 0 = match inputs), `--norm dBFS` (default -0.2),
 `--filter SUBSTRING`, `--plot`, one of `--bright` / `--dark` / `--mids`,
 `--low-hz HZ` (default 250), `--high-hz HZ` (default 5000),
-`--margin-db DB` (bright/dark default 0; mids default = cohort tilt std).
+`--margin-db DB` (bright/dark default 0; mids default = cohort tilt std),
+`--highpass HZ` / `--lowpass HZ` (band-shaping, below).
+
+### Band-shaping for black-box IR loaders (`--highpass` / `--lowpass`)
+
+Once a summary IR is loaded into a hardware unit (e.g. a pedal-format preamp),
+there are no utility blocks left to trim waveform-extreme energy — so the tool
+can bake standard bandpassing into the summary at creation time:
+
+- `--highpass HZ` — 3rd-order Butterworth high-pass, **18 dB/oct**
+- `--lowpass HZ` — 2nd-order Butterworth low-pass, **12 dB/oct**
+
+Both are **−3 dB at the stated corner** (the usual pedal/plugin convention) and
+are applied in the magnitude domain before the minimum-phase rebuild, so the
+filter phase is the minimum-phase response an analog filter would have — no
+pre-ringing, no added latency, no smeared onset. Filtering happens after tilt
+selection (it shapes the output, not which IRs are chosen) and **before** peak
+normalization, so dumping inaudible sub-bass usually buys real headroom. With
+`--plot`, the pre-filter average is drawn as a dashed ghost with the corners
+marked, so you can see exactly what the filter removed.
 
 ## Design reflections & possible refinements
 
