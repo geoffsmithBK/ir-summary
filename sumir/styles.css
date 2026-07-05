@@ -212,6 +212,12 @@ header {
 }
 
 /* ---- voicing controls ---- */
+.mode-controls-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 .mode-controls {
     display: inline-flex;
     background: var(--inset);
@@ -443,6 +449,169 @@ input[type="number"]::placeholder {
     flex-wrap: wrap;
 }
 
+/* ---- info tooltip (circle-i) ---- */
+.info-tooltip {
+    position: relative;
+    display: inline-flex;
+}
+
+.info-trigger {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--inset);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-style: italic;
+    font-weight: 600;
+    font-size: 0.72rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.info-trigger:hover,
+.info-trigger[aria-expanded="true"] {
+    color: var(--accent-bright);
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.info-trigger:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.info-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    z-index: 30;
+    width: max-content;
+    max-width: min(300px, calc(100vw - 44px));
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    font-size: 0.83rem;
+    line-height: 1.5;
+    color: var(--text);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+
+.info-popover:focus {
+    outline: none;
+}
+
+.info-popover p + p {
+    margin-top: 8px;
+}
+
+.info-popover strong {
+    color: var(--accent-bright);
+    font-weight: 600;
+}
+
+.info-popover a {
+    color: var(--accent);
+}
+
+/* ---- modal ---- */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 10, 12, 0.68);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 50;
+}
+
+.modal-dialog {
+    position: relative;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    width: 100%;
+    max-width: 560px;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    padding: 30px 26px 24px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-dialog:focus {
+    outline: none;
+}
+
+.modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--inset);
+    color: var(--muted);
+    font-size: 1.1rem;
+    line-height: 1;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.modal-close:hover {
+    color: var(--accent-bright);
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+.modal-close:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.modal-body p {
+    margin-bottom: 14px;
+    font-size: 0.92rem;
+    line-height: 1.6;
+    color: var(--text);
+}
+
+.modal-body p:last-child {
+    margin-bottom: 0;
+}
+
+.modal-body strong {
+    color: var(--accent-bright);
+    font-weight: 600;
+}
+
+.modal-body a {
+    color: var(--accent);
+}
+
+.popover-list {
+    margin: 4px 0 14px;
+    padding-left: 20px;
+}
+
+.popover-list li {
+    margin-bottom: 10px;
+}
+
+.popover-list li:last-child {
+    margin-bottom: 0;
+}
+
+body.modal-open {
+    overflow: hidden;
+}
+
 /* ---- footer ---- */
 footer {
     text-align: center;
@@ -453,6 +622,25 @@ footer p {
     font-family: var(--font-mono);
     font-size: 0.75rem;
     color: var(--muted);
+}
+
+.link-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: var(--accent);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.link-btn:hover {
+    color: var(--accent-bright);
+}
+
+.link-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
 }
 
 /* ---- utility ---- */
@@ -472,8 +660,14 @@ footer p {
         gap: 18px;
     }
 
+    .mode-controls-row {
+        gap: 8px;
+    }
+
     .mode-controls {
         display: flex;
+        flex: 1 1 auto;
+        min-width: 0;
     }
 
     .mode-controls label {
@@ -484,6 +678,16 @@ footer p {
         display: block;
         text-align: center;
         padding: 7px 0;
+    }
+
+    .info-popover {
+        left: auto;
+        right: 0;
+        max-width: calc(100vw - 28px);
+    }
+
+    .modal-dialog {
+        padding: 26px 18px 20px;
     }
 
     #plot-canvas {

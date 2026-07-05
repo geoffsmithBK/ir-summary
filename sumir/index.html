@@ -36,11 +36,14 @@
 
             <fieldset id="controls" class="panel">
                 <legend>Voicing</legend>
-                <div class="mode-controls" role="radiogroup" aria-label="Tilt selection">
-                    <label><input type="radio" name="mode" value="all" checked><span>All</span></label>
-                    <label><input type="radio" name="mode" value="bright"><span>Bright</span></label>
-                    <label><input type="radio" name="mode" value="dark"><span>Dark</span></label>
-                    <label><input type="radio" name="mode" value="mids"><span>Mids</span></label>
+                <div class="mode-controls-row">
+                    <div class="mode-controls" role="radiogroup" aria-label="Tilt selection">
+                        <label><input type="radio" name="mode" value="all" checked><span>All</span></label>
+                        <label><input type="radio" name="mode" value="bright"><span>Bright</span></label>
+                        <label><input type="radio" name="mode" value="dark"><span>Dark</span></label>
+                        <label><input type="radio" name="mode" value="mids"><span>Mids</span></label>
+                    </div>
+                    <span id="mode-tooltip-slot"></span>
                 </div>
                 <p class="mode-hint">Bright / Dark / Mids average only that region of the pack&rsquo;s tilt axis</p>
 
@@ -136,7 +139,7 @@
         </main>
 
         <footer>
-            <p>All processing happens in your browser &middot; files never leave your machine</p>
+            <p>All processing happens in your browser &middot; files never leave your machine &middot; <button type="button" id="why-link" class="link-btn">why?</button></p>
         </footer>
     </div>
 
