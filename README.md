@@ -46,3 +46,7 @@ first run. Full option reference and worked examples live in
   `sumir/`.
 - **Phase 2:** audition/preview (hear the summary through a guitar DI) and
   folder-drop.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
