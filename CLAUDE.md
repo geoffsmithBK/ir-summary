@@ -34,11 +34,15 @@ Parity discipline:
 - UI/UX asymmetry is fine and expected (CLI has `--filter`/`--exclude`; web has
   output-format options). Only the pipeline needs parity.
 
-Deferred (deliberately, 2026-07-05): a committed parity harness — a script that
-generates synthetic IRs, runs both implementations, and asserts < 0.1 dB
-agreement. Until it exists, re-verify parity manually after touching either
-side's DSP. This is the highest-leverage guard against drift; build it if
-pipeline changes start happening regularly.
+Parity harness (seeded 2026-07-06): `tests/synthetic_ir_harness.py` generates a
+pack of synthetic IRs with Gaussian-distributed spectral tilt and exercises the
+DSP. It is currently **Python-side only** — it runs `ir_average.py` (All vs Mids)
+and reports the difference; its synthetic-IR generator is the intended shared
+input for the still-deferred two-sided check (a Node runner pushing the same
+WAVs through `sumir/dsp.js`, asserting < 0.1 dB agreement). Until that JS runner
+exists, re-verify JS↔Python parity manually after touching either side's DSP.
+Building the two-sided half is the highest-leverage guard against drift; do it
+if pipeline changes start happening regularly.
 
 ## Testing
 
