@@ -143,7 +143,8 @@ Options: `-o PATH` / `--name BASENAME` (one required), `--exclude SUBSTR`
 `--filter SUBSTRING`, `--plot`, one of `--bright` / `--dark` / `--mids`,
 `--low-hz HZ` (default 250), `--high-hz HZ` (default 5000),
 `--margin-db DB` (bright/dark default 0; mids default = cohort tilt std),
-`--highpass HZ` / `--lowpass HZ` (band-shaping, below).
+`--highpass HZ` / `--lowpass HZ` (band-shaping, below),
+`--bandpassonly` (+ `--keep-level`) for the single-IR flow (below).
 
 ### Band-shaping for black-box IR loaders (`--highpass` / `--lowpass`)
 
@@ -162,6 +163,30 @@ selection (it shapes the output, not which IRs are chosen) and **before** peak
 normalization, so dumping inaudible sub-bass usually buys real headroom. With
 `--plot`, the pre-filter average is drawn as a dashed ghost with the corners
 marked, so you can see exactly what the filter removed.
+
+#### Band-shaping a single IR (`--bandpassonly`)
+
+Sometimes you already have one IR you like and just want to trim its extremes —
+no averaging. `--bandpassonly` takes exactly one input WAV and at least one of
+`--highpass` / `--lowpass`, and writes the filtered result:
+
+```bash
+python3 ir_average.py --bandpassonly "My Cab IR.wav" -o "My Cab IR - HP80 LP8k.wav" \
+    --highpass 80 --lowpass 8000 --plot
+# or drop it next to the source with a chosen name:
+python3 ir_average.py --bandpassonly "My Cab IR.wav" --name "My Cab IR - trimmed" --highpass 80
+```
+
+The same analytic Butterworth corners apply (18 dB/oct HP, 12 dB/oct LP, −3 dB
+at corner), but here the band gain is applied as a **minimum-phase filter
+multiplied onto the original waveform** — the IR keeps its own captured phase
+and character rather than being rebuilt as minimum-phase. The result is
+peak-normalized to `--norm` (default −0.2 dBFS); pass `--keep-level` to skip
+that and preserve the input's original level instead (mutually exclusive with an
+explicit `--norm`). `--plot` draws the original as a grey ghost against the
+filtered curve. The averaging-only flags (`--dir`, `--filter`, `--exclude`,
+`--bright`/`--dark`/`--mids`, `--method`, `--weighting`) are rejected in this
+mode with a one-line message.
 
 ## Design reflections & possible refinements
 

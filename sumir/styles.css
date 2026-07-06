@@ -173,6 +173,34 @@ header {
     color: var(--muted);
 }
 
+/* discreet text toggle into the single-IR bandpass flow */
+.bandpass-toggle {
+    display: inline-block;
+    margin-top: 12px;
+    padding: 0;
+    background: none;
+    border: none;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    text-decoration-color: var(--border);
+    transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+.bandpass-toggle:hover {
+    color: var(--accent-bright);
+    text-decoration-color: var(--accent);
+}
+
+.bandpass-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
 /* ---- buttons ---- */
 .btn {
     font-family: var(--font-ui);

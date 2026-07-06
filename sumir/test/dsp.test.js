@@ -12,6 +12,7 @@ import {
     minimumPhaseFromMag,
     butterworthBandMag,
     averageIRs,
+    bandpassIR,
 } from '../dsp.js';
 
 // Deterministic pseudo-random (no Math.random in tests).
@@ -417,4 +418,80 @@ test('inputs of different lengths are padded to the longest', () => {
     const res = averageIRs([a, b], sr, {});
     assert.equal(res.status, 'ok');
     assert.equal(res.out.length, 2048);
+});
+
+// ---- bandpassIR (single-IR bandpass-only flow) ----
+// A flat-spectrum delta reveals the filter's own response directly. bandpassIR
+// runs at N = x.length, so measure at bins snapped on THAT grid (not nextPow2).
+function delta(n) {
+    const a = new Float64Array(n);
+    a[0] = 0.97;
+    return a;
+}
+
+function levelAtGrid(x, sr, hz, N) {
+    const mag = magSpectrum(x, N);
+    const bin = Math.round((hz * N) / sr);
+    return 20 * Math.log10(Math.max(mag[bin], 1e-12));
+}
+
+function expectedDbAtGrid(hz, N, sr, hp, lp) {
+    const f = (Math.round((hz * N) / sr) * sr) / N; // snapped bin frequency
+    let g = 1;
+    if (hp) {
+        const r = f / hp;
+        g *= (r * r * r) / Math.sqrt(1 + r ** 6);
+    }
+    if (lp) {
+        const r = f / lp;
+        g /= Math.sqrt(1 + r ** 4);
+    }
+    return 20 * Math.log10(g);
+}
+
+test('bandpassIR applies the band at N = length and normalizes to -0.2 dBFS', () => {
+    const sr = 48000;
+    const n = 8192; // power of two so the test helper magSpectrum can measure it
+    const out = bandpassIR(delta(n), sr, { highpass: 80, lowpass: 8000 });
+    assert.equal(out.length, n);
+    const ref = levelAtGrid(out, sr, 1000, n) - expectedDbAtGrid(1000, n, sr, 80, 8000);
+    for (const hz of [80, 8000, 40, 16000]) {
+        const got = levelAtGrid(out, sr, hz, n) - ref;
+        const want = expectedDbAtGrid(hz, n, sr, 80, 8000);
+        assert.ok(Math.abs(got - want) < 0.1, `${hz} Hz: got ${got.toFixed(2)}, want ${want.toFixed(2)}`);
+    }
+    const peak = Math.max(...out.map(Math.abs));
+    assert.ok(Math.abs(peak - Math.pow(10, -0.2 / 20)) < 1e-9);
+});
+
+test('bandpassIR preserves the input level when normalize:false (#9)', () => {
+    const sr = 48000;
+    const n = 8192;
+    const norm = bandpassIR(delta(n), sr, { highpass: 80 });
+    const raw = bandpassIR(delta(n), sr, { highpass: 80, normalize: false });
+    const peakNorm = Math.max(...norm.map(Math.abs));
+    const peakRaw = Math.max(...raw.map(Math.abs));
+    // normalized path lands exactly on -0.2 dBFS; the preserved path does not
+    assert.ok(Math.abs(peakNorm - Math.pow(10, -0.2 / 20)) < 1e-9);
+    assert.ok(Math.abs(peakRaw - peakNorm) > 1e-6, `raw ${peakRaw} vs norm ${peakNorm}`);
+    // the two differ only by the single normalization scalar
+    const k = peakNorm / peakRaw;
+    for (let i = 0; i < n; i += 311) {
+        assert.ok(Math.abs(norm[i] - raw[i] * k) < 1e-9, `sample ${i}`);
+    }
+});
+
+test('bandpassIR runs at a non-power-of-two length (numpy grid)', () => {
+    const sr = 48000;
+    const out = bandpassIR(delta(8000), sr, { highpass: 100 });
+    assert.equal(out.length, 8000);
+    const peak = Math.max(...out.map(Math.abs));
+    assert.ok(Math.abs(peak - Math.pow(10, -0.2 / 20)) < 1e-9);
+});
+
+test('bandpassIR rejects invalid corners', () => {
+    assert.throws(() => bandpassIR(delta(1024), 48000, { highpass: 8000, lowpass: 8000 }), /below/);
+    assert.throws(() => bandpassIR(delta(1024), 48000, { lowpass: 24000 }), /Nyquist/);
+    assert.throws(() => bandpassIR(delta(1024), 48000, { highpass: -5 }), /positive/);
+    assert.throws(() => bandpassIR(delta(1024), 48000, {}), /at least one/);
 });

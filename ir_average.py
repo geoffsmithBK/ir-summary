@@ -109,13 +109,18 @@ def main():
     ap.add_argument("--weighting", choices=["linear", "power"], default="linear",
                     help="magnitude method: average |H| (linear) or |H|^2 then sqrt (power/RMS)")
     ap.add_argument("--length", type=int, default=0, help="output length in samples (0 = match inputs)")
-    ap.add_argument("--norm", type=float, default=-0.2, help="output peak normalize target in dBFS")
+    ap.add_argument("--norm", type=float, default=None, help="output peak normalize target in dBFS (default -0.2)")
     ap.add_argument("-o", "--out", help="output WAV path (full path); alternative to --name")
     ap.add_argument("--name", help="output base filename written into the --dir being summarized "
                                    "(or cwd); alternative to -o")
     ap.add_argument("--exclude", action="append", metavar="SUBSTR",
                     help="skip input files whose name contains SUBSTR (repeatable)")
     ap.add_argument("--plot", action="store_true", help="also write a PNG magnitude-response comparison")
+    ap.add_argument("--bandpassonly", action="store_true",
+                    help="filter a SINGLE input IR with --highpass/--lowpass only (no averaging); "
+                         "preserves the IR's own phase/character")
+    ap.add_argument("--keep-level", action="store_true",
+                    help="--bandpassonly only: skip renormalization, preserve the input's original level")
     # ---- optional band-shaping of the summary (for black-box IR loaders) ----
     ap.add_argument("--highpass", type=float, default=None, metavar="HZ",
                     help="18 dB/oct Butterworth high-pass at HZ, applied to the summary (min-phase, -3 dB at HZ)")
@@ -142,6 +147,13 @@ def main():
             sys.exit(f"{flag} must be a positive frequency in Hz.")
     if args.highpass is not None and args.lowpass is not None and args.highpass >= args.lowpass:
         sys.exit(f"--highpass ({args.highpass:g} Hz) must be below --lowpass ({args.lowpass:g} Hz).")
+
+    if args.keep_level and not args.bandpassonly:
+        sys.exit("--keep-level is only valid with --bandpassonly.")
+
+    if args.bandpassonly:
+        run_bandpass_only(args)
+        return
 
     # resolve output path: -o is a full path; --name is a base filename placed in
     # the folder being summarized (or cwd). exactly one is required.
@@ -304,9 +316,10 @@ def main():
 
     # peak-normalize (after filtering, so dumping out-of-band energy buys
     # headroom); the ghost gets the same scalar so passbands overlay on the plot
+    norm = args.norm if args.norm is not None else -0.2
     peak = np.max(np.abs(out))
     if peak > 0:
-        target = 10 ** (args.norm / 20.0)
+        target = 10 ** (norm / 20.0)
         out = out * (target / peak)
         if out_pre is not None:
             out_pre = out_pre * (target / peak)
@@ -321,6 +334,125 @@ def main():
             write_plot(out_path, out, files, aligned, dropped, mode, args, sr, L, out_pre)
         except Exception as e:
             print(f"WARNING: could not write plot: {e}", file=sys.stderr)
+
+
+def run_bandpass_only(args):
+    """Band-shape a SINGLE existing IR with the Butterworth high/low-pass and
+    write it back out — no averaging. The filter is applied as a minimum-phase
+    spectrum multiplied onto the ORIGINAL waveform's FFT, so the IR keeps its
+    own captured phase/character (we do NOT rebuild it as min-phase)."""
+    # reject flags that belong to the averaging flow
+    rejected = []
+    if args.dir:
+        rejected.append("--dir")
+    if args.filter:
+        rejected.append("--filter")
+    if args.exclude:
+        rejected.append("--exclude")
+    for m in ("bright", "dark", "mids"):
+        if getattr(args, m):
+            rejected.append(f"--{m}")
+    if args.method != "magnitude":
+        rejected.append("--method")
+    if args.weighting != "linear":
+        rejected.append("--weighting")
+    if rejected:
+        sys.exit(f"--bandpassonly filters a single IR with --highpass/--lowpass only; "
+                 f"it does not support: {', '.join(rejected)}.")
+
+    if len(args.files) != 1:
+        sys.exit(f"--bandpassonly needs exactly one input WAV; got {len(args.files)}.")
+    if args.highpass is None and args.lowpass is None:
+        sys.exit("--bandpassonly needs at least one of --highpass / --lowpass.")
+    if args.keep_level and args.norm is not None:
+        sys.exit("--keep-level preserves the input level; it conflicts with an explicit --norm.")
+
+    # output path: -o is a full path; --name is a base filename placed next to
+    # the input file (--dir doesn't apply here). exactly one is required.
+    if bool(args.out) == bool(args.name):
+        sys.exit("Specify exactly one of -o/--out (full path) or --name (filename next to the input).")
+    in_path = args.files[0]
+    if args.out:
+        out_path = args.out
+    else:
+        base = args.name if args.name.lower().endswith(".wav") else args.name + ".wav"
+        out_path = os.path.join(os.path.dirname(os.path.abspath(in_path)), base)
+
+    x, sr = load_mono(in_path)
+    for flag, val in (("--highpass", args.highpass), ("--lowpass", args.lowpass)):
+        if val is not None and val >= sr / 2:
+            sys.exit(f"{flag} ({val:g} Hz) must be below Nyquist ({sr / 2:g} Hz).")
+
+    L = len(x)
+    band_gain = butterworth_band_mag(np.fft.fftfreq(L, 1 / sr), args.highpass, args.lowpass)
+    parts = []
+    if args.highpass:
+        parts.append(f"high-pass {args.highpass:g} Hz (18 dB/oct)")
+    if args.lowpass:
+        parts.append(f"low-pass {args.lowpass:g} Hz (12 dB/oct)")
+    print(f"Bandpass {os.path.basename(in_path)} @ {sr} Hz  ({L} samples)")
+    print(f"Filters: {', '.join(parts)}  [min-phase Butterworth, -3 dB at corner]")
+
+    # apply the band as a minimum-phase filter to the original waveform
+    out = np.fft.ifft(np.fft.fft(x) * minimum_phase_spectrum(band_gain)).real
+
+    # peak-normalize after filtering (dumping out-of-band energy reclaims
+    # headroom); the ghost gets the same scalar so passbands overlay on the plot.
+    # --keep-level (#9) skips this to preserve the input's original level.
+    out_pre = x
+    if args.keep_level:
+        print("Keeping input level (no renormalization).")
+    else:
+        norm = args.norm if args.norm is not None else -0.2
+        peak = np.max(np.abs(out))
+        if peak > 0:
+            scale = 10 ** (norm / 20.0) / peak
+            out = out * scale
+            out_pre = x * scale
+
+    sf.write(out_path, out.astype(np.float32), sr, subtype="PCM_24")
+    print(f"\nWrote {out_path}  ({len(out)} samples, 24-bit, {sr} Hz)")
+
+    if args.plot:
+        # The WAV is the deliverable; a plot failure should warn, not fail.
+        try:
+            write_bandpass_plot(out_path, out, out_pre, args, sr, L, os.path.basename(in_path))
+        except Exception as e:
+            print(f"WARNING: could not write plot: {e}", file=sys.stderr)
+
+
+def write_bandpass_plot(out_path, out, out_pre, args, sr, L, in_name):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import FixedLocator, FuncFormatter
+    N = L
+    freqs = np.fft.rfftfreq(N, 1 / sr)
+    mo = np.abs(np.fft.rfft(out, N))
+    ref_db = 20 * np.log10(np.maximum(mo.max(), 1e-9))
+    fig, ax = plt.subplots(figsize=(11, 6))
+    mp = np.abs(np.fft.rfft(out_pre, N))
+    ax.semilogx(freqs, 20 * np.log10(np.maximum(mp, 1e-9)) - ref_db,
+                color="0.72", lw=1.4, ls="--", label="original")
+    ax.semilogx(freqs, 20 * np.log10(np.maximum(mo, 1e-9)) - ref_db,
+                color="crimson", lw=2.2, label="filtered")
+    corners = [f for f in (args.highpass, args.lowpass) if f]
+    fl_label = " / ".join(f"{'HP' if f == args.highpass else 'LP'} {f:g} Hz" for f in corners)
+    for i, f in enumerate(corners):
+        ax.axvline(f, color="teal", lw=1.0, ls="--",
+                   label=f"filters: {fl_label}" if i == 0 else None)
+    ax.set_xlim(20, sr / 2); ax.set_ylim(-40, 6)
+    ticks = [t for t in (20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000) if t <= sr / 2]
+    ax.xaxis.set_major_locator(FixedLocator(ticks))
+    ax.xaxis.set_minor_locator(FixedLocator([]))
+    ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{int(v):,}"))
+    ax.grid(True, which="major", alpha=0.3)
+    ax.set_xlabel("Hz"); ax.set_ylabel("dB")
+    ax.set_title(f"{os.path.basename(out_path)} — {in_name} (grey) vs bandpassed (red)")
+    ax.legend()
+    png = os.path.splitext(out_path)[0] + ".png"
+    fig.tight_layout(); fig.savefig(png, dpi=110)
+    print(f"Wrote {png}")
 
 
 def write_plot(out_path, out, files, aligned, dropped, mode, args, sr, L, out_pre=None):

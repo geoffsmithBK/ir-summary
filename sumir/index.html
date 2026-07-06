@@ -29,6 +29,7 @@
                         <p class="drop-lead">Drop 2+ impulse responses on the speaker</p>
                         <button id="file-select-btn" class="btn btn-quiet" type="button">Browse files</button>
                         <p class="file-types">WAV &middot; 16 / 24 / 32-bit &middot; one shared sample rate</p>
+                        <button id="bandpass-toggle" class="bandpass-toggle" type="button">Bandpass a single IR</button>
                     </div>
                     <input type="file" id="file-input" accept=".wav,.WAV" multiple>
                 </div>
@@ -83,7 +84,9 @@
                                 <option value="50">50 Hz</option>
                                 <option value="80">80 Hz</option>
                                 <option value="120">120 Hz</option>
+                                <option value="custom">Enter value&hellip;</option>
                             </select>
+                            <input type="number" id="highpass-custom" class="hidden" min="1" step="1" placeholder="Hz" aria-label="High-pass frequency (Hz)">
                         </div>
                         <div class="option-group">
                             <label for="lowpass">Low-pass (12 dB/oct)</label>
@@ -92,10 +95,58 @@
                                 <option value="6000">6 kHz</option>
                                 <option value="8000">8 kHz</option>
                                 <option value="10000">10 kHz</option>
+                                <option value="custom">Enter value&hellip;</option>
                             </select>
+                            <input type="number" id="lowpass-custom" class="hidden" min="1" step="1" placeholder="Hz" aria-label="Low-pass frequency (Hz)">
                         </div>
                     </div>
                 </details>
+            </fieldset>
+
+            <fieldset id="bandpass-panel" class="panel hidden">
+                <legend>Bandpass</legend>
+                <p class="mode-hint">Filter a single IR with the Butterworth high / low-pass &mdash; no averaging, no plot.</p>
+                <div class="advanced-options">
+                    <div class="option-group">
+                        <label for="bp-highpass">High-pass (18 dB/oct)</label>
+                        <select id="bp-highpass">
+                            <option value="" selected>None</option>
+                            <option value="50">50 Hz</option>
+                            <option value="80">80 Hz</option>
+                            <option value="120">120 Hz</option>
+                            <option value="custom">Enter value&hellip;</option>
+                        </select>
+                        <input type="number" id="bp-highpass-custom" class="hidden" min="1" step="1" placeholder="Hz" aria-label="High-pass frequency (Hz)">
+                    </div>
+                    <div class="option-group">
+                        <label for="bp-lowpass">Low-pass (12 dB/oct)</label>
+                        <select id="bp-lowpass">
+                            <option value="" selected>None</option>
+                            <option value="6000">6 kHz</option>
+                            <option value="8000">8 kHz</option>
+                            <option value="10000">10 kHz</option>
+                            <option value="custom">Enter value&hellip;</option>
+                        </select>
+                        <input type="number" id="bp-lowpass-custom" class="hidden" min="1" step="1" placeholder="Hz" aria-label="Low-pass frequency (Hz)">
+                    </div>
+                </div>
+                <div class="output-row">
+                    <p id="bp-output-filename" class="mono"></p>
+                    <div class="output-format">
+                        <select id="bp-bit-depth" aria-label="Bit depth">
+                            <option value="16">16-bit PCM</option>
+                            <option value="24" selected>24-bit PCM</option>
+                            <option value="32">32-bit float</option>
+                        </select>
+                        <select id="bp-sample-rate" aria-label="Sample rate">
+                            <option value="source" selected>Source rate</option>
+                            <option value="44100">44.1 kHz</option>
+                            <option value="48000">48 kHz</option>
+                            <option value="96000">96 kHz</option>
+                        </select>
+                        <button id="bp-save-btn" class="btn btn-primary" type="button" disabled>Save bandpassed IR</button>
+                    </div>
+                </div>
             </fieldset>
 
             <div id="processing" class="notice processing hidden">
