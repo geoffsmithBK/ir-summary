@@ -130,6 +130,10 @@
                         <input type="number" id="bp-lowpass-custom" class="hidden" min="1" step="1" placeholder="Hz" aria-label="Low-pass frequency (Hz)">
                     </div>
                 </div>
+                <div class="bp-normalize-row">
+                    <label class="checkbox-label"><input type="checkbox" id="bp-normalize" checked><span>Renormalize to &minus;0.2&nbsp;dBFS</span></label>
+                    <span id="bp-normalize-tooltip-slot"></span>
+                </div>
                 <div class="output-row">
                     <p id="bp-output-filename" class="mono"></p>
                     <div class="output-format">

@@ -9,7 +9,7 @@ import { deriveOutputName, deriveBandpassName } from './naming.js';
 import { drawPlot } from './plot.js';
 import { resample } from './resample.js';
 import { createInfoTooltip, openModal } from './popover.js';
-import { TILT_TOOLTIP_COPY, WHY_MODAL_COPY } from './copy.js';
+import { TILT_TOOLTIP_COPY, WHY_MODAL_COPY, RENORMALIZE_TOOLTIP_COPY } from './copy.js';
 
 const el = (id) => document.getElementById(id);
 const dropzone = el('dropzone');
@@ -92,6 +92,7 @@ function readBandpassControls() {
     return {
         highpass: resolveHz('bp-highpass'),
         lowpass: resolveHz('bp-lowpass'),
+        normalize: el('bp-normalize').checked,
         bitDepth: parseInt(el('bp-bit-depth').value, 10),
         sampleRate: el('bp-sample-rate').value,
     };
@@ -297,7 +298,7 @@ function rerunBandpass() {
         out = bandpassIR(bpLoaded.signal, bpLoaded.sr, {
             highpass: cfg.highpass,
             lowpass: cfg.lowpass,
-            normalize: true, // #9 --keep-level wiring lands with its own UI later
+            normalize: cfg.normalize, // unchecked = preserve the input's level (#9)
         });
     } catch (e) {
         fail(e.message);
@@ -393,6 +394,11 @@ syncCustomFields();
 const modeTooltipSlot = el('mode-tooltip-slot');
 modeTooltipSlot?.replaceWith(
     createInfoTooltip(TILT_TOOLTIP_COPY, { label: 'About voicing selection' })
+);
+
+const bpNormalizeTooltipSlot = el('bp-normalize-tooltip-slot');
+bpNormalizeTooltipSlot?.replaceWith(
+    createInfoTooltip(RENORMALIZE_TOOLTIP_COPY, { label: 'About renormalization' })
 );
 
 const whyLink = el('why-link');

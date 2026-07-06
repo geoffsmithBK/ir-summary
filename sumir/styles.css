@@ -351,6 +351,30 @@ header {
     color: var(--muted);
 }
 
+/* renormalize checkbox in the bandpass flow (#9) */
+.bp-normalize-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
 /* ---- fields ---- */
 select,
 input[type="number"] {

@@ -30,3 +30,7 @@ Additionally, SumIR provides a visual graph of the resulting summary IR as well 
 
 Most importantly, SumIR runs *locally*. All processing happens in your browser and the files you upload for summarization never leave your computer/tablet/phone.
 `.trim();
+
+export const RENORMALIZE_TOOLTIP_COPY = `
+Filtering removes energy, so the filtered IR ends up quieter than the file you dropped. **Renormalize** (the default) brings its peak back up to −0.2 dBFS — dumping inaudible sub-bass or fizz this way buys real headroom in a hardware loader. Uncheck to **preserve the original level**: the IR keeps the input file's own scale, minus only what the filters removed — handy when A/B level-matching against the unfiltered original.
+`.trim();
