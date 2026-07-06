@@ -675,6 +675,10 @@ footer p {
     color: var(--muted);
 }
 
+.footer-links {
+    margin-top: 6px;
+}
+
 .link-btn {
     background: none;
     border: none;
