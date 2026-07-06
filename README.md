@@ -10,6 +10,8 @@ comb-filters wherever phases disagree), but by aligning, averaging the
 **magnitude** spectra, and rebuilding a tight **minimum-phase** IR — the truest
 tonal center-of-gravity of the group.
 
+**[Try web version live](https://geoffsmithbk.github.io/ir-summary/)**
+
 ## What's here
 
 - **`ir_average.py`** — the command-line tool (magnitude/min-phase averaging,
