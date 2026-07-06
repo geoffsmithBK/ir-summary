@@ -10,7 +10,7 @@
  */
 
 export const TILT_TOOLTIP_COPY = `
-Emphasize brighter, darker, or middle-of-the-pack IRs during the averaging process. SumIR measures each IR's *spectral tilt* — its level above 5 kHz minus its level below 250 Hz — and compares it to the group average: **Bright** keeps the IRs tilted brighter than average, **Dark** keeps the darker ones, and **Mids** keeps those closest to the average (the Advanced *margin* sets how picky the selection is). No frequency-based processing (i.e. equalization) is performed on any file in this stage, it's merely a selection process (and so works better with larger summarization cohorts).
+Skew the averaging toward the brighter or darker IRs in the group. SumIR measures each IR's *spectral tilt* — its level above 5 kHz minus its level below 250 Hz — and compares it to the group average: **Brighter** keeps only the IRs tilted brighter than average, **Darker** keeps only the darker ones (the Advanced *margin* sets how picky the selection is). No frequency-based processing (i.e. equalization) is performed on any file in this stage, it's merely a selection process (and so works better with larger summarization cohorts).
 `.trim();
 
 export const WHY_MODAL_COPY = `
@@ -22,7 +22,7 @@ SumIR to the rescue: a simple, web-based tool that processes a few, or a dozen, 
 
 Additionally, SumIR provides a visual graph of the resulting summary IR as well as options for:
 
-• Emphasizing brighter, darker, or middle-of-the-pack IRs during the averaging process. SumIR measures each IR's spectral tilt — how its energy above 5 kHz compares to its energy below 250 Hz — and averages only the brighter-than-average, darker-than-average, or least-extreme members of the group. No frequency-based processing (i.e. equalization) is applied to any file in this stage; it's purely a selection process (and so works better with larger summarization cohorts).
+• Emphasizing the brighter or darker IRs during the averaging process. SumIR measures each IR's spectral tilt — how its energy above 5 kHz compares to its energy below 250 Hz — and averages only the brighter-than-average or darker-than-average members of the group. No frequency-based processing (i.e. equalization) is applied to any file in this stage; it's purely a selection process (and so works better with larger summarization cohorts).
 
 • Summarization algorithms based on magnitude (averaging just the tonal fingerprint of each IR and rebuilding a clean minimum-phase result; this is the default) or time alignment (averaging the actual waveforms after lining up their onsets, which keeps a 'real' captured IR). All the IRs to be summarized must share one sample rate.
 

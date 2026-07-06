@@ -403,5 +403,5 @@ bpNormalizeTooltipSlot?.replaceWith(
 
 const whyLink = el('why-link');
 whyLink?.addEventListener('click', () => {
-    openModal(WHY_MODAL_COPY, { title: 'Why SumIR?', triggerEl: whyLink });
+    openModal(WHY_MODAL_COPY, { title: 'About SumIR', triggerEl: whyLink });
 });
