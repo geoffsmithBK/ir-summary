@@ -9,6 +9,7 @@ import { deriveOutputName, deriveBandpassName } from './naming.js';
 import { drawPlot } from './plot.js';
 import { resample } from './resample.js';
 import { createInfoTooltip, openModal } from './popover.js';
+import { SELECTION_TUNING_IDS, inactiveOptionIds } from './options.js';
 import { TILT_TOOLTIP_COPY, WHY_MODAL_COPY, RENORMALIZE_TOOLTIP_COPY } from './copy.js';
 
 const el = (id) => document.getElementById(id);
@@ -67,6 +68,21 @@ function syncCustomFields() {
         const sel = el(id);
         const custom = el(`${id}-custom`);
         if (sel && custom) custom.classList.toggle('hidden', sel.value !== 'custom');
+    }
+}
+
+// Grey out the tilt-measure controls when no tilt region is picked: they only
+// feed cohort selection, which doesn't run in "All" mode. Values are left
+// intact so switching back to Bright/Dark/Mids restores what was typed.
+function syncSelectionTuning() {
+    const mode = document.querySelector('input[name="mode"]:checked')?.value ?? 'all';
+    const inactive = new Set(inactiveOptionIds(mode));
+    for (const id of SELECTION_TUNING_IDS) {
+        const input = el(id);
+        if (!input) continue;
+        const off = inactive.has(id);
+        input.disabled = off;
+        input.closest('.option-group')?.classList.toggle('is-inactive', off);
     }
 }
 
@@ -368,6 +384,7 @@ bandpassToggle.addEventListener('click', (e) => {
 // live re-render on any control change
 controls.addEventListener('change', () => {
     syncCustomFields();
+    syncSelectionTuning();
     rerun();
 });
 controls.addEventListener('input', (e) => {
@@ -389,6 +406,7 @@ bpSaveBtn.addEventListener('click', saveBandpass);
 // controls are useful before the first drop too (they apply live after it)
 controls.classList.remove('hidden');
 syncCustomFields();
+syncSelectionTuning();
 
 // info tooltip + "why?" modal
 const modeTooltipSlot = el('mode-tooltip-slot');

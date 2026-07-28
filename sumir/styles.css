@@ -350,6 +350,25 @@ header {
     color: var(--muted);
 }
 
+/* tilt-measure controls, greyed out when no tilt region is picked (#21) */
+.option-group.is-inactive label {
+    opacity: 0.45;
+}
+
+.option-group input:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+
+.option-note {
+    grid-column: 1 / -1;
+    margin: -4px 0 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--muted);
+    opacity: 0.8;
+}
+
 /* renormalize checkbox in the bandpass flow (#9) */
 .bp-normalize-row {
     display: flex;
